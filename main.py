@@ -10,158 +10,24 @@ import os
 import re
 import argparse
 
+from display import *
+from task import *
+
 max_child_shown = 5
 
-def stringify(task, tasks=None, fullpath=False):
-    middle = 'x' if task['status'] else ' '
-    desc = task['desc']
-    if fullpath:
-        desc = get_full_path(tasks, task)
-    start_str = ""
-    due_str = ""
-    if task['status'] == None:
-        if task['start'] != None:
-            start_str = get_start_text(dateutil.parser.parse(task['start']))
-            if not (start_str.endswith("ago") or start_str.endswith('yesterday')):
-                start_str = ' <ansiblue>(' + start_str + ')</ansiblue>'
-            else:
-                start_str = ''
-        if start_str == "" and task['due'] != None:
-            due_str = get_due_text(dateutil.parser.parse(task['due']))
-            if due_str.endswith("ago") or due_str.endswith('yesterday'):
-                due_str = ' <ansired>(' + due_str + ')</ansired>'
-            else:
-                due_str = ' <ansigreen>(' + due_str + ')</ansigreen>'
-    time_str = start_str + due_str
-
-    tags_str = ''
-    if task['tags'] != None:
-        tags = [i.strip() for i in task['tags'].strip().split(' ') if i.strip() not in ['', 'group', 'collapse']]
-        if len(tags) > 0:
-            tags_str = '#'+' #'.join(tags)
-            tags_str = ' <ansiyellow>'+tags_str+'</ansiyellow>'
-
-    suffix = ''
-    if has_tag(task, 'collapse') and len(get_pending_children_single(task)) > 0:
-        suffix = " <ansigray>(collapsed)</ansigray>"
-
-    if has_tag(task, 'group'):
-        return '- ' + desc + time_str + tags_str + suffix
-    else:
-        return '- ['+middle+'] ' + desc + time_str + tags_str + suffix
-
-
-def is_filtered(x, filters):
-    return True in [i(x) for i in filters]
 
 def sort_tasks(data, filters):
-    data.sort(key=lambda x: (x['created'] == None,
-                             x['created'],
+    data.sort(key=lambda x: (x.created == None,
+                             x.created,
                              ),
               reverse=True)
+    limit = cal.parseDT('in 2 days', datetime.now())[0]
     data.sort(key=lambda x: (
-                             (get_earliest_due(tasks, x, 'in 2 days', filters=filters) == None),
-                             (get_earliest_due(tasks, x, 'in 2 days', filters=filters)),
-                             (has_tag(x, 'group') and len(get_children(x, filters)) == 0),
-                             (0 if x['gauge'] == None else x['gauge']),
+                             (x.get_earliest_due(limit, filters=filters) == None),
+                             (x.get_earliest_due(limit, filters=filters)),
+                             (x.has_tag('group') and len(x.get_children(filters)) == 0),
+                             x.gauge,
                             ))
-
-
-def get_rel_time_text(date):
-    now = cal.parseDT('now')[0]
-    delta = date - now
-    seconds = 24*60*60-delta.seconds
-    if delta.days == -1:
-        hours = seconds//(60*60)
-        hour_str = " hours" if hours != 1 else " hour"
-        minutes = seconds//60 - hours*60
-        min_str = " minutes" if minutes != 1 else " minute"
-        if hours > 0:
-            return str(hours) + hour_str + " and " + str(minutes) + min_str + " ago", True
-        else:
-            return str(minutes) + min_str + " ago", True
-    if delta.days == -2:
-        return "yesterday", True
-    elif delta.days < -1:
-        return str(-delta.days) + " days ago", True
-    elif delta.days == 1:
-        return "tomorrow", False
-    elif delta.days > 1:
-        return "in " + str(delta.days) + " days", False
-    else: # in less than 1 day
-        hours = delta.seconds//(60*60)
-        hour_str = " hours" if hours > 1 else " hour"
-        minutes = delta.seconds//60 - hours*60
-        min_str = " minutes" if minutes > 1 else " minute"
-        if hours > 0:
-            return "in " + str(hours) + hour_str + " and " + str(minutes) + min_str, False
-        else:
-            return "in " + str(minutes) + min_str, False
-
-
-def get_due_text(date):
-    time_str, _ = get_rel_time_text(date)
-    return "Due "+time_str
-
-
-def get_start_text(date):
-    time_str, past = get_rel_time_text(date)
-    if past:
-        return "Started "+time_str
-    else:
-        return "Starts "+time_str
-
-
-def get_root_uid(tasks, task):
-    ct = task
-    while ct['parent'] != None:
-        ct = tasks[ct['parent']]
-    return ct['uuid'];
-
-
-def get_full_path(tasks, task):
-    path = task['desc']
-    ct = task
-    while ct['parent'] != None:
-        ct = tasks[ct['parent']]
-        path = ct['desc']+'/'+path
-    return path;
-
-
-def get_children(x, filters=[]):
-    l = list(cur.execute('select * from tasks where parent = {}'.format(x['uuid'])).fetchall())
-    return [i for i in l if not is_filtered(dict(i), filters)]
-
-def get_pending_children_single(x):
-    return list(cur.execute('select * from tasks where parent = {} and status IS NULL'.format(x['uuid'])).fetchall())
-
-def get_pending_children(tasks, x):
-    return [i for i in tasks if i['parent'] == x['uuid'] and i['status'] == None]
-
-def get_recursive_children(tasks, x):
-    all_children = []
-    exec_recursively(x, tasks, 0, lambda x, _a, _b, _c: all_children.append(x))
-    all_children = [i for i in all_children if i != x]
-    return all_children
-
-
-def get_earliest_due(tasks, task, limit=None, filters=[]):
-    children = [i for i in tasks.values() if i['parent'] == task['uuid'] and i['status'] == None]
-    children = [i for i in children if not is_filtered(i, filters)]
-    cur_due = dateutil.parser.parse(task['due']) if task['due'] != None else None
-    cur_start = dateutil.parser.parse(task['start']) if task['start'] != None else None
-    if len(children) == 0:
-        if cur_start != None and cur_start >= now:
-            return None
-        if cur_due == None or limit != None and cur_due <= cal.parseDT(limit, now)[0]:
-            return cur_due
-
-    dues = [get_earliest_due(tasks, i, limit, filters) for i in children]
-    dues = [i for i in dues if i != None]
-    if cur_due != None:
-        dues = [cur_due] + dues
-
-    return min(dues) if len(dues) > 0 else None
 
 
 def get_depth(tasks, task):
@@ -182,8 +48,7 @@ def write_int(task, attr, val):
     cur.execute("UPDATE tasks SET {} = {} WHERE uuid = {}".format(attr, 'NULL' if val == None else val, task['uuid'])) 
 
 def get_new_uuid(neg=False):
-    all_uuids = list(cur.execute("SELECT uuid FROM tasks").fetchall())
-    all_uuids = [i['uuid'] for i in all_uuids]
+    all_uuids = [i['uuid'] for i in cur.execute("SELECT uuid FROM tasks").fetchall()]
     if neg:
         for i in range(0, min(all_uuids)-2, -1):
             if i not in all_uuids:
@@ -195,19 +60,32 @@ def get_new_uuid(neg=False):
     assert(False)
 
 
+#def exec_recursively_simple(task, tasks, func, sort_filters):
+#    if task.uuid != None:
+#        func(task)
+#
+#    children = task.get_children()
+#    sort_tasks(children, sort_filters)
+#
+#    for i in children:
+#        exec_recursively_simple(i, tasks, func, sort_filters)
+
+
 def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
     if args.get('limit', [None])[0] == 0:
         return
 
     # Apply functions breadth-first if applicable
-    if breadthfirst and task['uuid'] != None and depth >= 0: # cool hack
+    if breadthfirst and task.uuid != None and depth >= 0: # cool hack
         func(task, tasks, depth, args)
         if args.get('limit', [None])[0] != None:
             args['limit'][0] -= 1
 
-    children = [j for j in tasks if j['parent'] == task['uuid']]
+    filters = args.get('filters', [])
+
+    children = task.get_children(filters)
     if 'filters' in args:
-        children = [i for i in children if not is_filtered(i, args['filters'])]
+        children = [i for i in children if not i.is_filtered(args['filters'])]
     hidden = 0
     sort_tasks(children, args.get('sort_filters', []))
 
@@ -217,7 +95,7 @@ def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
         children = children[:args['limit_children']]
 
     # Recursive part
-    if args.get('hidden_function', None) == None or not has_tag(task, 'collapse'):
+    if args.get('hidden_function', None) == None or not task.has_tag('collapse'):
         for i in children:
             exec_recursively(i, tasks, depth+1, func, args)
 
@@ -225,18 +103,19 @@ def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
         args['hidden_function'](hidden, depth+1)
 
     # Apply functions depth-first if applicable
-    if not breadthfirst and task['uuid'] != None and depth >= 0:
+    if not breadthfirst and task.uuid != None and depth >= 0:
         func(task, tasks, depth)
         if args.get('limit', [None])[0] != None:
             args['limit'][0] -= 1
 
 was_separated = False
-def print_tree_line(task, tasks, depth, _args = None):
+def print_tree_line(task, tasks, depth, args = None):
+    filters = args.get('filters', [])
+
     global was_separated
     prev_sep = was_separated
     if depth == 0:
-        if (task['tags'] != None and 'group' in task['tags']) or \
-           (len(get_recursive_children(tasks, task)) >= 2):
+        if task.has_tag('group') or len(task.get_descendants()) >= 2:
             print(' '*justw + ' | ')
             was_separated = True
         else:
@@ -245,7 +124,7 @@ def print_tree_line(task, tasks, depth, _args = None):
     if prev_sep and not was_separated:
         print(' '*justw + ' | ')
 
-    print(HTML(str(task['uuid']).rjust(justw) + ' | ' + ' '*4*depth + stringify(task)))
+    print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task)))
 
 def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=None):
     exec_recursively(root_task, tasks, -1, print_tree_line,
@@ -255,68 +134,56 @@ def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=Non
                       'filters': filters})
 
 
-def update_uuid(old_uuid, new_uuid):
-    cur.execute("UPDATE tasks SET uuid = '{}' WHERE uuid = {}".format(new_uuid, old_uuid)) 
+def update_uuid(task, new_uuid):
+    old_uuid = task.uuid
+    task.write_int('uuid', new_uuid)
     cur.execute("UPDATE tasks SET parent = '{}' WHERE parent = {}".format(new_uuid, old_uuid)) 
-    cur.execute("UPDATE tasks SET depends = replace(depends, '&{}&', '&{}&')".format(old_uuid, new_uuid)) 
+    cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', ' {} ')".format(old_uuid, new_uuid)) 
 
 
-def assign_uuid(task, _tasks, _depth, _args = None):
-    new_uuid = get_new_uuid(task['status'] != None)
-    update_uuid(task['uuid'], new_uuid)
+def assign_uuid(task):
+    new_uuid = get_new_uuid(task.status != None)
+    update_uuid(task, new_uuid)
 
 def remove(task, _tasks = None, _depth = None, _args = None):
     print('Removing task', task)
-    cur.execute("UPDATE tasks SET depends = replace(depends, '&{}&', '&&')".format(task['uuid'])) 
-    cur.execute("DELETE FROM tasks WHERE uuid = {}".format(task['uuid']))
+    cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', '  ')".format(task.uuid)) 
+    cur.execute("DELETE FROM tasks WHERE uuid = {}".format(task.uuid))
 
 
-def defrag(tasks):
+def defrag(cur):
+    # strip all names if they have whitespaces for some reason
     cur.execute("UPDATE tasks SET desc = trim(desc)")
-    uuid_max = max(tasks.keys())
-    uuid_min = min(tasks.keys())
-    for k, i in tasks.items():
+
+    tasks = [Task(cur, dict(i)) for i in cur.execute("SELECT * FROM tasks").fetchall()]
+    uuids = [i.uuid for i in tasks]
+    uuid_max = max(uuids)
+    uuid_min = min(uuids)
+    for i in tasks:
+        k = i.uuid
         if k < 0:
-            update_uuid(k, k+uuid_min-2) # So that we can rewrite the uuids later without conflicts
+            update_uuid(i, k+uuid_min-2) # So that we can rewrite the uuids later without conflicts
         else:
-            update_uuid(k, k+uuid_max+1) # So that we can rewrite the uuids later without conflicts
-    data = list(cur.execute('select * from tasks').fetchall())
-    tasks.clear()
-    tasks.update({i['uuid']: dict(i) for i in data})
+            update_uuid(i, k+uuid_max+1) # So that we can rewrite the uuids later without conflicts
 
-    exec_recursively({'uuid': None}, tasks.values(), 0, assign_uuid)
+    tasks = [Task(cur, dict(i)) for i in cur.execute("SELECT * FROM tasks").fetchall()]
+    sort_filters = [
+        (lambda i: (i.status != None)),
+        (lambda i: not i.has_started(cal.parseDT('in 24 hours', now)[0])),
+        (lambda i: i.has_pending_dependency()),
+    ]
+    sort_tasks(tasks, sort_filters)
+    for i in tasks:
+        assign_uuid(i)
+    #exec_recursively_simple(Task(cur, {'uuid': None}), tasks, assign_uuid, sort_filters)
     con.commit()
-
-def is_dependent_recursive(task, tasks):
-    d = has_pending_dependency(task, tasks)
-    if d:
-        return True
-    else:
-        return True in [is_dependent_recursive(i, tasks) for i in get_pending_children(tasks.values(), task)]
-
-def has_pending_dependency(task, tasks):
-    if task['depends'] == None:
-        return False
-    deps = [int(i.strip('&')) for i in task['depends'].split(' ')]
-    # array of dependecies that have not been completed
-    unsatis = [tasks[i]['status'] == None for i in deps]
-    return True in unsatis
-
-
-def is_descendant(child, root, tasks):
-    if child['uuid'] == root or child['parent'] == root:
-        return True
-    elif child['parent'] == None:
-        return False
-    else:
-        return is_descendant(tasks[child['parent']], root, tasks)
 
 
 def split_esc(text, ch):
     return re.split(r'(?<!\\)'+ch, text)
 
 
-def parse_new_task(tasks, args):
+def parse_new_task(args):
     path = None
     start = None
     due = None
@@ -363,13 +230,6 @@ def parse_new_task(tasks, args):
     return task
 
 
-def has_tag(task, tag):
-    if task.get('tags', None) == None:
-        return False
-    tags = [i.strip() for i in task['tags'].split(' ')]
-    return tag in tags
-
-
 def fetch_pending_task(desc, parent=None):
     if parent != None:
         candidates = list(cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}' AND parent={}".format(desc, parent)).fetchall())
@@ -398,19 +258,10 @@ def str_to_uuid(s):
         return fetch_pending_task(splitted[-1], parent_uuid)
 
 
-def update_gauge(task, new_gauge):
-    old_gauge = 0 if task['gauge'] == None else task['gauge']
-    delta_gauge = new_gauge - old_gauge
-    write_int(task, 'gauge', new_gauge)
-    for i in get_children(task, []):
-        old_gauge_i = 0 if i['gauge'] == None else i['gauge']
-        update_gauge(i, old_gauge_i + delta_gauge)
 
 
-def has_started(task, curtime):
-    return (task['start'] == None or dateutil.parser.parse(task['start']) <= curtime)
-    
-
+def get_task(cur, uuid):
+    return Task(cur, dict(cur.execute('SELECT * FROM tasks WHERE uuid={}'.format(uuid)).fetchone()))
 
 con = sqlite3.connect("tasks.db")
 con.row_factory = sqlite3.Row
@@ -419,10 +270,10 @@ cur = con.cursor()
 session = PromptSession()
 
 data = list(cur.execute('select * from tasks').fetchall())
-tasks = {i['uuid']: dict(i) for i in data}
+tasks = {Task(cur, dict(i)) for i in data}
 
 while True:
-    task_descs = [i['desc'] for i in tasks.values()]
+    task_descs = [i.desc for i in tasks]
     task_descs = {i: None for i in task_descs}
     completer = NestedCompleter.from_nested_dict({
         'add': task_descs,
@@ -461,14 +312,14 @@ while True:
 
     # Load tasks
     data = list(cur.execute('select * from tasks').fetchall())
-    tasks = {i['uuid']: dict(i) for i in data}
+    tasks = {Task(cur, dict(i)) for i in data}
 
 
     try:
         if command in ['exit', 'quit', 'q']:
             break
         elif command == 'add':
-            task = parse_new_task(tasks, clist[1])
+            task = parse_new_task(clist[1])
             print(task)
             cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task['uuid'], task['parent'], task['desc']))
             write_str(task, 'start', task['start'])
@@ -482,66 +333,67 @@ while True:
             parser.add_argument('uuid', type=int)
             parser.add_argument('new_args', type=str)
             args = parser.parse_args(clist[1].split(' ', 1))
-            new_task = parse_new_task(tasks, args.new_args)
-            write_str(tasks[int(args.uuid)], 'desc', new_task['desc'])
+            new_task = parse_new_task(args.new_args)
+            get_task(cur, args.uuid).write_str('desc', new_task['desc'])
             con.commit()
         elif command == 'redef':
             parser = argparse.ArgumentParser()
             parser.add_argument('uuid', type=int)
             parser.add_argument('new_args', type=str)
             args = parser.parse_args(clist[1].split(' ', 1))
-            old_task = tasks[args.uuid]
-            new_task = parse_new_task(tasks, args.new_args)
-            write_str(old_task, 'desc', new_task['desc'])
-            write_str(old_task, 'start', new_task['start'])
-            write_str(old_task, 'due', new_task['due'])
-            write_str(old_task, 'repeat', new_task['repeat'])
+            old_task = get_task(cur, args.uuid)
+            new_task = parse_new_task(args.new_args)
+            old_task.write_str('desc', new_task['desc'])
+            old_task.write_str('start', new_task['start'])
+            old_task.write_str('due', new_task['due'])
+            old_task.write_str('repeat', new_task['repeat'])
             con.commit()
         elif command == 'done':
-            task = tasks[str_to_uuid(clist[1])]
-            repeat = task['repeat']
+            task = get_task(cur, str_to_uuid(clist[1]))
+            repeat = task.repeat
             if repeat != None:
                 print(repeat)
                 repeat = repeat.removeprefix('every ')
                 if not (repeat[0:2] == 'a ' or repeat[0].isdigit()):
                     repeat = '1 '+repeat
                 new_start = None
-                if task['start'] != None:
-                    new_start = cal.parseDT('in '+repeat, dateutil.parser.parse(task['start']))[0]
-                new_due = cal.parseDT('in '+repeat, dateutil.parser.parse(task['due']))[0]
+                if task.start != None:
+                    new_start = cal.parseDT('in '+repeat, task.start)[0]
+                if task.due != None:
+                    new_due = cal.parseDT('in '+repeat, task.due)[0]
                 if new_start != None:
-                    print('Reset "' + task['desc'] + '" to ' + str(new_start)+" ~ "+str(new_due))
-                    write_str(task, 'start', str(new_start))
+                    print('Reset "' + task.desc + '" to ' + str(new_start)+" ~ "+str(new_due))
+                    task.write_str('start', str(new_start))
                 else:
-                    print('Reset "' + task['desc'] + '" to ' + str(new_due))
-                write_str(task, 'due', str(new_due))
+                    print('Reset "' + task.desc + '" to ' + str(new_due))
+                task.write_str('due', str(new_due))
             else:
-                print('Completed "' + task['desc'] + '".')
-                write_str(task, 'status', str(now))
+                print('Completed "' + task.desc + '".')
+                task.write_str('status', str(now))
             con.commit()
         elif command == 'undone':
-            task = tasks[str_to_uuid(clist[1])]
-            write_str(task, 'status', None)
+            task = get_task(cur, str_to_uuid(clist[1]))
+            task.write_str('status', None)
             con.commit()
         elif command in ['setstart', 'start']:
             args = clist[1].split(' ', 1)
-            task = tasks[int(args[0])]
+            task = get_task(cur, int(args[0]))
             new_start = None if len(args) == 1 else cal.parseDT(args[1], now)[0]
             print("set new start to", str(new_start))
-            write_str(task, 'start', new_start)
+            task.write_str('start', new_start)
             con.commit()
         elif command in ['setdue', 'due']:
             args = clist[1].split(' ', 1)
-            task = tasks[int(args[0])]
+            task = get_task(cur, int(args[0]))
             new_due = None if len(args) == 1 else cal.parseDT(args[1], now)[0]
             print("set new due to", str(new_due))
-            write_str(task, 'due', new_due)
+            task.write_str('due', new_due)
             con.commit()
         elif command in ['setrepeat', 'repeat']:
             args = clist[1].split(' ', 1)
-            task = tasks[int(args[0])]
+            task = get_task(cur, int(args[0]))
             new_repeat = None if len(args) == 1 else args[1]
-            write_str(task, 'repeat', args[1])
+            task.write_str('repeat', args[1])
             con.commit()
         elif command == 'rm':
             parser = argparse.ArgumentParser()
@@ -550,28 +402,30 @@ while True:
             args = parser.parse_args(clist[1].split(' '))
             recursive = False
             uuid = str_to_uuid(' '.join(args.arg))
+            task = get_task(cur, uuid)
             if args.r:
-                exec_recursively(tasks[uuid], tasks.values(), 0, remove, {}, False)
+                exec_recursively(task, tasks.values(), 0, remove, {}, False)
             else:
                 if len(cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
                     print("Can't remove task with children. Use -r for recursive removal.")
                 else:
-                    remove(tasks[uuid])
+                    remove(task)
             con.commit()
         elif command == 'cat':
-            print(tasks[str_to_uuid(clist[1])])
+            print(get_task(cur, str_to_uuid(clist[1])))
         elif command == 'mv':
             uuid = int(clist[1].split(' ')[0])
+            task = get_task(cur, uuid)
             arg = clist[1].split(' ')[1]
             if arg == '..':
-                write_int(tasks[uuid], 'parent', tasks[tasks[uuid].parent].parent)
+                task.write_int('parent', task.get_parent().parent)
             elif arg == '/':
-                write_int(tasks[uuid], 'parent', None)
+                task.write_int('parent', None)
             else:
-                write_int(tasks[uuid], 'parent', int(arg))
+                task.write_int('parent', int(arg))
             con.commit()
         elif command in ['list', 'ls', 'tree']:
-            default_limit = 30 if command == 'tree' else 5
+            default_limit = 10 if command == 'tree' else 5
             os.system('clear')
             parser = argparse.ArgumentParser()
             parser.add_argument('--all', action='store_true')
@@ -582,46 +436,48 @@ while True:
             parser.add_argument('arg', type=str, nargs='*')
             args = parser.parse_args([] if len(clist) == 1 else clist[1].split(' '))
 
-            justw = max([len(str(i)) for i in tasks.keys()])
+            justw = max([len(str(i.uuid)) for i in tasks])
             sort_filters = [
-                (lambda i: (i['status'] != None)),
-                (lambda i: not has_started(i, cal.parseDT('in 24 hours', now)[0])),
+                (lambda i: (i.status != None)),
+                (lambda i: not i.has_started(cal.parseDT('in 24 hours', now)[0])),
             ]
 
             filters = sort_filters
 
             if args.blocked:
-                sort_filters.append(lambda i: not is_dependent_recursive(i, tasks))
+                sort_filters.append(lambda i: not i.is_dependent())
             else:
-                sort_filters.append(lambda i: has_pending_dependency(i, tasks))
+                sort_filters.append(lambda i: i.has_pending_dependency())
 
             if command != 'tree':
-                sort_filters += [lambda i: has_tag(i, 'group')]
+                sort_filters += [lambda i: i.has_tag('group')]
             if args.all:
                 filters = []
             elif args.due:
-                filters = sort_filters + [lambda i: get_earliest_due(tasks, i) == None]
+                filters = sort_filters + [lambda i: i.get_earliest_due() == None]
             else:
                 filters = sort_filters
 
             limit = None if args.nolimit else args.n
             root = None if args.arg == [] else str_to_uuid(' '.join(args.arg))
 
-            filtered = [i for i in tasks.values() if is_descendant(i, root, tasks)]
+            data = list(cur.execute('select * from tasks').fetchall())
+            tasks = [Task(cur, dict(i)) for i in data]
+            filtered = [i for i in tasks if i.is_descendant(root)]
 
             if command == 'tree':
                 if root != None:
-                    print_tree(filtered, sort_filters, filters, tasks[root], limit=limit)
+                    print_tree(filtered, sort_filters, filters, get_task(cur, root), limit=limit)
                 else:
-                    print_tree(filtered, sort_filters, filters, limit=limit)
+                    print_tree(filtered, sort_filters, filters, Task(cur, {}), limit=limit)
             else:
-                filtered = [i for i in filtered if not is_filtered(i, filters)]
+                filtered = [i for i in filtered if not i.is_filtered(filters)]
                 sort_tasks(filtered, sort_filters)
                 if limit != None:
                     remaining = limit
                     stop_idx = limit
                     for k, i in enumerate(filtered):
-                        if get_earliest_due(tasks, i) != None or not has_started(i, now):
+                        if i.get_earliest_due() != None or not i.has_started(now):
                             continue
                         remaining -= 1
                         if remaining == 0:
@@ -629,62 +485,44 @@ while True:
 
                     filtered = filtered[:stop_idx]
                 for i in filtered:
-                    print(HTML(str(i['uuid']).ljust(justw) + ' | ' + stringify(i, tasks, True)))
+                    print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True)))
 
         elif command in ['depends', 'dep']:
             args = [int(i) for i in clist[1].split(' on ')]
             for i in range(1, len(args)):
-                old_depends = tasks[args[i-1]]['depends']
-                if old_depends == None:
-                    new_depends = '&'+str(args[i])+'&'
-                else:
-                    new_depends = old_depends + ' &'+str(args[i])+'&'
-                cur.execute("UPDATE tasks SET depends = '{}' WHERE uuid = {}".format(new_depends, args[i-1])) 
+                get_task(cur, args[i-1]).add_dependency(args[i])
             con.commit()
 
         elif command in ['tag']:
-            if len(clist[1].split(' ')) == 1:
-                uuid = int(clist[1])
+            args = clist[1].split(' ', 1)
+            uuid = int(args[0])
+            if len(args) == 1:
                 cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(uuid)) 
                 con.commit()
                 continue
-            uuid, tag_list = [i for i in clist[1].split(' ', 1)]
-            uuid = int(uuid)
-            tag_list = tag_list.replace(',', '').split(' ')
+            tag_list = args[1].replace(',', '').replace('#', '').split(' ')
             tag_list = [i.strip() for i in tag_list if i.strip() != '']
-            old_tags = tasks[uuid]['tags']
-            if old_tags == None:
-                new_tags = ' ' + ' '.join(tag_list) + ' '
-            else:
-                if old_tags[-1] != ' ':
-                    old_tags += ' '
-                new_tags = old_tags + str(' '.join(tag_list)) + ' '
-            print('old_tags =', old_tags, 'and new_tags =', new_tags)
-            cur.execute("UPDATE tasks SET tags = '{}' WHERE uuid = {}".format(new_tags, uuid)) 
+            get_task(cur, uuid).add_tags(tag_list)
             con.commit()
 
         elif command in ['scry', 'scr', 'bump']:
             uuid = str_to_uuid(clist[1])
-            parent = cur.execute('SELECT parent FROM tasks WHERE uuid = {}'.format(uuid)).fetchone()[0]
-            if parent == None:
+            task = get_task(cur, uuid)
+            if task.parent == None:
                 gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
             else:
-                gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(parent, uuid)).fetchall())
+                gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
             gauges = [i[0] if i[0] != None else 0 for i in gauges]
 
             if command in ['scry', 'scr']:
-                if len(gauges) == 0:
-                    update_gauge(tasks[uuid], 1)
-                else:
-                    update_gauge(tasks[uuid], max(gauges)+1)
+                max_gauges = max(gauges) if len(gauges) > 0 else 0
+                task.update_gauge(max_gauges+1)
             else:
-                if len(gauges) == 0:
-                    update_gauge(tasks[uuid], -1)
-                else:
-                    update_gauge(tasks[uuid], min(gauges)-1)
+                min_gauges = min(gauges) if len(gauges) > 0 else 0
+                task.update_gauge(min_gauges-1)
             con.commit()
         elif command == 'defrag':
-            defrag(tasks)
+            defrag(cur)
         elif command == 'clear':
             os.system('clear')
         elif command == '':
