@@ -464,230 +464,233 @@ while True:
     tasks = {i['uuid']: dict(i) for i in data}
 
 
-    if command in ['exit', 'quit', 'q']:
-        break
-    elif command == 'add':
-        task = parse_new_task(tasks, clist[1])
-        print(task)
-        cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task['uuid'], task['parent'], task['desc']))
-        write_str(task, 'start', task['start'])
-        write_str(task, 'due', task['due'])
-        write_str(task, 'repeat', task['repeat'])
-        write_str(task, 'tags', task['tags'])
-        write_str(task, 'created', str(now))
-        con.commit()
-    elif command == 'rename':
-        parser = argparse.ArgumentParser()
-        parser.add_argument('uuid', type=int)
-        parser.add_argument('new_args', type=str)
-        args = parser.parse_args(clist[1].split(' ', 1))
-        new_task = parse_new_task(tasks, args.new_args)
-        write_str(tasks[int(args.uuid)], 'desc', new_task['desc'])
-        con.commit()
-    elif command == 'redef':
-        parser = argparse.ArgumentParser()
-        parser.add_argument('uuid', type=int)
-        parser.add_argument('new_args', type=str)
-        args = parser.parse_args(clist[1].split(' ', 1))
-        old_task = tasks[args.uuid]
-        new_task = parse_new_task(tasks, args.new_args)
-        write_str(old_task, 'desc', new_task['desc'])
-        write_str(old_task, 'start', new_task['start'])
-        write_str(old_task, 'due', new_task['due'])
-        write_str(old_task, 'repeat', new_task['repeat'])
-        con.commit()
-    elif command == 'done':
-        task = tasks[str_to_uuid(clist[1])]
-        repeat = task['repeat']
-        if repeat != None:
-            print(repeat)
-            repeat = repeat.removeprefix('every ')
-            if not (repeat[0:2] == 'a ' or repeat[0].isdigit()):
-                repeat = '1 '+repeat
-            new_start = None
-            if task['start'] != None:
-                new_start = cal.parseDT('in '+repeat, dateutil.parser.parse(task['start']))[0]
-            new_due = cal.parseDT('in '+repeat, dateutil.parser.parse(task['due']))[0]
-            if new_start != None:
-                print('Reset "' + task['desc'] + '" to ' + str(new_start)+" ~ "+str(new_due))
-                write_str(task, 'start', str(new_start))
+    try:
+        if command in ['exit', 'quit', 'q']:
+            break
+        elif command == 'add':
+            task = parse_new_task(tasks, clist[1])
+            print(task)
+            cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task['uuid'], task['parent'], task['desc']))
+            write_str(task, 'start', task['start'])
+            write_str(task, 'due', task['due'])
+            write_str(task, 'repeat', task['repeat'])
+            write_str(task, 'tags', task['tags'])
+            write_str(task, 'created', str(now))
+            con.commit()
+        elif command == 'rename':
+            parser = argparse.ArgumentParser()
+            parser.add_argument('uuid', type=int)
+            parser.add_argument('new_args', type=str)
+            args = parser.parse_args(clist[1].split(' ', 1))
+            new_task = parse_new_task(tasks, args.new_args)
+            write_str(tasks[int(args.uuid)], 'desc', new_task['desc'])
+            con.commit()
+        elif command == 'redef':
+            parser = argparse.ArgumentParser()
+            parser.add_argument('uuid', type=int)
+            parser.add_argument('new_args', type=str)
+            args = parser.parse_args(clist[1].split(' ', 1))
+            old_task = tasks[args.uuid]
+            new_task = parse_new_task(tasks, args.new_args)
+            write_str(old_task, 'desc', new_task['desc'])
+            write_str(old_task, 'start', new_task['start'])
+            write_str(old_task, 'due', new_task['due'])
+            write_str(old_task, 'repeat', new_task['repeat'])
+            con.commit()
+        elif command == 'done':
+            task = tasks[str_to_uuid(clist[1])]
+            repeat = task['repeat']
+            if repeat != None:
+                print(repeat)
+                repeat = repeat.removeprefix('every ')
+                if not (repeat[0:2] == 'a ' or repeat[0].isdigit()):
+                    repeat = '1 '+repeat
+                new_start = None
+                if task['start'] != None:
+                    new_start = cal.parseDT('in '+repeat, dateutil.parser.parse(task['start']))[0]
+                new_due = cal.parseDT('in '+repeat, dateutil.parser.parse(task['due']))[0]
+                if new_start != None:
+                    print('Reset "' + task['desc'] + '" to ' + str(new_start)+" ~ "+str(new_due))
+                    write_str(task, 'start', str(new_start))
+                else:
+                    print('Reset "' + task['desc'] + '" to ' + str(new_due))
+                write_str(task, 'due', str(new_due))
             else:
-                print('Reset "' + task['desc'] + '" to ' + str(new_due))
-            write_str(task, 'due', str(new_due))
-        else:
-            print('Completed "' + task['desc'] + '".')
-            write_str(task, 'status', str(now))
-        con.commit()
-    elif command == 'undone':
-        task = tasks[str_to_uuid(clist[1])]
-        write_str(task, 'status', None)
-        con.commit()
-    elif command in ['setstart', 'start']:
-        args = clist[1].split(' ', 1)
-        task = tasks[int(args[0])]
-        new_start = None if len(args) == 1 else cal.parseDT(args[1], now)[0]
-        print("set new start to", str(new_start))
-        write_str(task, 'start', new_start)
-        con.commit()
-    elif command in ['setdue', 'due']:
-        args = clist[1].split(' ', 1)
-        task = tasks[int(args[0])]
-        new_due = None if len(args) == 1 else cal.parseDT(args[1], now)[0]
-        print("set new due to", str(new_due))
-        write_str(task, 'due', new_due)
-        con.commit()
-    elif command in ['setrepeat', 'repeat']:
-        args = clist[1].split(' ', 1)
-        task = tasks[int(args[0])]
-        new_repeat = None if len(args) == 1 else args[1]
-        write_str(task, 'repeat', args[1])
-        con.commit()
-    elif command == 'rm':
-        parser = argparse.ArgumentParser()
-        parser.add_argument('-r', action='store_true')
-        parser.add_argument('arg', type=str, nargs='+')
-        args = parser.parse_args(clist[1].split(' '))
-        recursive = False
-        uuid = str_to_uuid(' '.join(args.arg))
-        if args.r:
-            exec_recursively(tasks[uuid], tasks.values(), 0, remove, {}, False)
-        else:
-            if len(cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
-                print("Can't remove task with children. Use -r for recursive removal.")
+                print('Completed "' + task['desc'] + '".')
+                write_str(task, 'status', str(now))
+            con.commit()
+        elif command == 'undone':
+            task = tasks[str_to_uuid(clist[1])]
+            write_str(task, 'status', None)
+            con.commit()
+        elif command in ['setstart', 'start']:
+            args = clist[1].split(' ', 1)
+            task = tasks[int(args[0])]
+            new_start = None if len(args) == 1 else cal.parseDT(args[1], now)[0]
+            print("set new start to", str(new_start))
+            write_str(task, 'start', new_start)
+            con.commit()
+        elif command in ['setdue', 'due']:
+            args = clist[1].split(' ', 1)
+            task = tasks[int(args[0])]
+            new_due = None if len(args) == 1 else cal.parseDT(args[1], now)[0]
+            print("set new due to", str(new_due))
+            write_str(task, 'due', new_due)
+            con.commit()
+        elif command in ['setrepeat', 'repeat']:
+            args = clist[1].split(' ', 1)
+            task = tasks[int(args[0])]
+            new_repeat = None if len(args) == 1 else args[1]
+            write_str(task, 'repeat', args[1])
+            con.commit()
+        elif command == 'rm':
+            parser = argparse.ArgumentParser()
+            parser.add_argument('-r', action='store_true')
+            parser.add_argument('arg', type=str, nargs='+')
+            args = parser.parse_args(clist[1].split(' '))
+            recursive = False
+            uuid = str_to_uuid(' '.join(args.arg))
+            if args.r:
+                exec_recursively(tasks[uuid], tasks.values(), 0, remove, {}, False)
             else:
-                remove(tasks[uuid])
-        break
-        con.commit()
-    elif command == 'cat':
-        print(tasks[str_to_uuid(clist[1])])
-    elif command == 'mv':
-        uuid = int(clist[1].split(' ')[0])
-        arg = clist[1].split(' ')[1]
-        if arg == '..':
-            write_int(tasks[uuid], 'parent', tasks[tasks[uuid].parent].parent)
-        elif arg == '/':
-            write_int(tasks[uuid], 'parent', None)
-        else:
-            write_int(tasks[uuid], 'parent', int(arg))
-        con.commit()
-    elif command in ['list', 'ls', 'tree']:
-        default_limit = 30 if command == 'tree' else 5
-        os.system('clear')
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--all', action='store_true')
-        parser.add_argument('--due', action='store_true')
-        parser.add_argument('--blocked', action='store_true')
-        parser.add_argument('--nolimit', action='store_true')
-        parser.add_argument('-n', type=int, action='store', default=default_limit)
-        parser.add_argument('arg', type=str, nargs='*')
-        args = parser.parse_args([] if len(clist) == 1 else clist[1].split(' '))
+                if len(cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
+                    print("Can't remove task with children. Use -r for recursive removal.")
+                else:
+                    remove(tasks[uuid])
+            break
+            con.commit()
+        elif command == 'cat':
+            print(tasks[str_to_uuid(clist[1])])
+        elif command == 'mv':
+            uuid = int(clist[1].split(' ')[0])
+            arg = clist[1].split(' ')[1]
+            if arg == '..':
+                write_int(tasks[uuid], 'parent', tasks[tasks[uuid].parent].parent)
+            elif arg == '/':
+                write_int(tasks[uuid], 'parent', None)
+            else:
+                write_int(tasks[uuid], 'parent', int(arg))
+            con.commit()
+        elif command in ['list', 'ls', 'tree']:
+            default_limit = 30 if command == 'tree' else 5
+            os.system('clear')
+            parser = argparse.ArgumentParser()
+            parser.add_argument('--all', action='store_true')
+            parser.add_argument('--due', action='store_true')
+            parser.add_argument('--blocked', action='store_true')
+            parser.add_argument('--nolimit', action='store_true')
+            parser.add_argument('-n', type=int, action='store', default=default_limit)
+            parser.add_argument('arg', type=str, nargs='*')
+            args = parser.parse_args([] if len(clist) == 1 else clist[1].split(' '))
 
-        justw = max([len(str(i)) for i in tasks.keys()])
-        sort_filters = [
-            (lambda i: (i['status'] != None)),
-            (lambda i: not has_started(i, cal.parseDT('in 24 hours', now)[0])),
-        ]
+            justw = max([len(str(i)) for i in tasks.keys()])
+            sort_filters = [
+                (lambda i: (i['status'] != None)),
+                (lambda i: not has_started(i, cal.parseDT('in 24 hours', now)[0])),
+            ]
 
-        filters = sort_filters
-
-        if args.blocked:
-            sort_filters.append(lambda i: not is_dependent_recursive(i, tasks))
-        else:
-            sort_filters.append(lambda i: has_pending_dependency(i, tasks))
-
-        if command != 'tree':
-            sort_filters += [lambda i: has_tag(i, 'group')]
-        if args.all:
-            filters = []
-        elif args.due:
-            filters = sort_filters + [lambda i: get_earliest_due(tasks, i) == None]
-        else:
             filters = sort_filters
 
-        limit = None if args.nolimit else args.n
-        root = None if args.arg == [] else str_to_uuid(' '.join(args.arg))
-
-        filtered = [i for i in tasks.values() if is_descendant(i, root, tasks)]
-
-        if command == 'tree':
-            if root != None:
-                print_tree(filtered, sort_filters, filters, tasks[root], limit=limit)
+            if args.blocked:
+                sort_filters.append(lambda i: not is_dependent_recursive(i, tasks))
             else:
-                print_tree(filtered, sort_filters, filters, limit=limit)
-        else:
-            filtered = [i for i in filtered if not is_filtered(i, filters)]
-            sort_tasks(filtered, sort_filters)
-            remaining = limit
-            stop_idx = limit
-            for k, i in enumerate(filtered):
-                if get_earliest_due(tasks, i) != None or not has_started(i, now):
-                    continue
-                remaining -= 1
-                if remaining == 0:
-                    stop_idx = k+1
+                sort_filters.append(lambda i: has_pending_dependency(i, tasks))
 
-            filtered = filtered[:stop_idx]
-            for i in filtered:
-                print(HTML(str(i['uuid']).ljust(justw) + ' | ' + stringify(i, tasks, True)))
-
-    elif command in ['depends', 'dep']:
-        args = [int(i) for i in clist[1].split(' on ')]
-        for i in range(1, len(args)):
-            old_depends = tasks[args[i-1]]['depends']
-            if old_depends == None:
-                new_depends = '&'+str(args[i])+'&'
+            if command != 'tree':
+                sort_filters += [lambda i: has_tag(i, 'group')]
+            if args.all:
+                filters = []
+            elif args.due:
+                filters = sort_filters + [lambda i: get_earliest_due(tasks, i) == None]
             else:
-                new_depends = old_depends + ' &'+str(args[i])+'&'
-            cur.execute("UPDATE tasks SET depends = '{}' WHERE uuid = {}".format(new_depends, args[i-1])) 
-        con.commit()
+                filters = sort_filters
 
-    elif command in ['tag']:
-        if len(clist[1].split(' ')) == 1:
-            uuid = int(clist[1])
-            cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(uuid)) 
+            limit = None if args.nolimit else args.n
+            root = None if args.arg == [] else str_to_uuid(' '.join(args.arg))
+
+            filtered = [i for i in tasks.values() if is_descendant(i, root, tasks)]
+
+            if command == 'tree':
+                if root != None:
+                    print_tree(filtered, sort_filters, filters, tasks[root], limit=limit)
+                else:
+                    print_tree(filtered, sort_filters, filters, limit=limit)
+            else:
+                filtered = [i for i in filtered if not is_filtered(i, filters)]
+                sort_tasks(filtered, sort_filters)
+                if limit != None:
+                    remaining = limit
+                    stop_idx = limit
+                    for k, i in enumerate(filtered):
+                        if get_earliest_due(tasks, i) != None or not has_started(i, now):
+                            continue
+                        remaining -= 1
+                        if remaining == 0:
+                            stop_idx = k+1
+
+                filtered = filtered[:stop_idx]
+                for i in filtered:
+                    print(HTML(str(i['uuid']).ljust(justw) + ' | ' + stringify(i, tasks, True)))
+
+        elif command in ['depends', 'dep']:
+            args = [int(i) for i in clist[1].split(' on ')]
+            for i in range(1, len(args)):
+                old_depends = tasks[args[i-1]]['depends']
+                if old_depends == None:
+                    new_depends = '&'+str(args[i])+'&'
+                else:
+                    new_depends = old_depends + ' &'+str(args[i])+'&'
+                cur.execute("UPDATE tasks SET depends = '{}' WHERE uuid = {}".format(new_depends, args[i-1])) 
             con.commit()
+
+        elif command in ['tag']:
+            if len(clist[1].split(' ')) == 1:
+                uuid = int(clist[1])
+                cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(uuid)) 
+                con.commit()
+                continue
+            uuid, tag_list = [i for i in clist[1].split(' ', 1)]
+            uuid = int(uuid)
+            tag_list = tag_list.replace(',', '').split(' ')
+            tag_list = [i.strip() for i in tag_list if i.strip() != '']
+            old_tags = tasks[uuid]['tags']
+            if old_tags == None:
+                new_tags = ' ' + ' '.join(tag_list) + ' '
+            else:
+                if old_tags[-1] != ' ':
+                    old_tags += ' '
+                new_tags = old_tags + str(' '.join(tag_list)) + ' '
+            print('old_tags =', old_tags, 'and new_tags =', new_tags)
+            cur.execute("UPDATE tasks SET tags = '{}' WHERE uuid = {}".format(new_tags, uuid)) 
+            con.commit()
+
+        elif command in ['scry', 'scr', 'bump']:
+            uuid = str_to_uuid(clist[1])
+            parent = cur.execute('SELECT parent FROM tasks WHERE uuid = {}'.format(uuid)).fetchone()[0]
+            if parent == None:
+                gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
+            else:
+                gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(parent, uuid)).fetchall())
+            gauges = [i[0] if i[0] != None else 0 for i in gauges]
+
+            if command in ['scry', 'scr']:
+                if len(gauges) == 0:
+                    update_gauge(tasks[uuid], 1)
+                else:
+                    update_gauge(tasks[uuid], max(gauges)+1)
+            else:
+                if len(gauges) == 0:
+                    update_gauge(tasks[uuid], -1)
+                else:
+                    update_gauge(tasks[uuid], min(gauges)-1)
+            con.commit()
+        elif command == 'defrag':
+            defrag(tasks)
+        elif command == 'clear':
+            os.system('clear')
+        elif command == '':
             continue
-        uuid, tag_list = [i for i in clist[1].split(' ', 1)]
-        uuid = int(uuid)
-        tag_list = tag_list.replace(',', '').split(' ')
-        tag_list = [i.strip() for i in tag_list if i.strip() != '']
-        old_tags = tasks[uuid]['tags']
-        if old_tags == None:
-            new_tags = ' ' + ' '.join(tag_list) + ' '
         else:
-            if old_tags[-1] != ' ':
-                old_tags += ' '
-            new_tags = old_tags + str(' '.join(tag_list)) + ' '
-        print('old_tags =', old_tags, 'and new_tags =', new_tags)
-        cur.execute("UPDATE tasks SET tags = '{}' WHERE uuid = {}".format(new_tags, uuid)) 
-        con.commit()
-
-    elif command in ['scry', 'scr', 'bump']:
-        uuid = str_to_uuid(clist[1])
-        parent = cur.execute('SELECT parent FROM tasks WHERE uuid = {}'.format(uuid)).fetchone()[0]
-        if parent == None:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
-        else:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(parent, uuid)).fetchall())
-        gauges = [i[0] if i[0] != None else 0 for i in gauges]
-
-        if command in ['scry', 'scr']:
-            if len(gauges) == 0:
-                update_gauge(tasks[uuid], 1)
-            else:
-                update_gauge(tasks[uuid], max(gauges)+1)
-        else:
-            if len(gauges) == 0:
-                update_gauge(tasks[uuid], -1)
-            else:
-                update_gauge(tasks[uuid], min(gauges)-1)
-        con.commit()
-    elif command == 'defrag':
-        defrag(tasks)
-
-    elif command == 'clear':
-        os.system('clear')
-    elif command == '':
-        continue
-    else:
-        print("Unknown command.")
+            print("Unknown command.")
+    except AssertionError:
+        print("Assertion not satisfied, cancelling command.")
