@@ -441,6 +441,7 @@ while True:
         'dep': None,
         'tag': None,
         'scry': task_descs,
+        'bump': task_descs,
         'defrag': None,
         'clear': None,
     })
