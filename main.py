@@ -34,32 +34,45 @@ def stringify(task, tasks=None, fullpath=False):
                 due_str = ' <ansigreen>(' + due_str + ')</ansigreen>'
     time_str = start_str + due_str
 
+    tags_str = ''
+    if task['tags'] != None:
+        tags = [i.strip() for i in task['tags'].strip().split(' ') if i.strip() not in ['', 'group', 'collapse']]
+        if len(tags) > 0:
+            tags_str = '#'+' #'.join(tags)
+            tags_str = ' <ansiyellow>'+tags_str+'</ansiyellow>'
+
     suffix = ''
     if has_tag(task, 'collapse') and len(get_pending_children_single(task)) > 0:
         suffix = " <ansigray>(collapsed)</ansigray>"
 
     if has_tag(task, 'group'):
-        return '- ' + desc + time_str + suffix
+        return '- ' + desc + time_str + tags_str + suffix
     else:
-        return '- ['+middle+'] ' + desc + time_str + suffix
+        return '- ['+middle+'] ' + desc + time_str + tags_str + suffix
 
 
 def is_filtered(x, filters):
     return True in [i(x) for i in filters]
 
 def sort_tasks(data, filters):
-    data.sort(key=lambda x: (x['created'] == None,
-                             x['created'],
-                             ),
-              reverse=True)
-    data.sort(key=lambda x: (is_filtered(x, filters),
-                             get_earliest_due(tasks, x, 'in 2 days', filters=filters) == None,
-                             get_earliest_due(tasks, x, 'in 2 days', filters=filters),
-                             #(has_tag(x, 'group') and len(get_pending_children_single(x)) == 0),
+    #data.sort(key=lambda x: (x['created'] == None,
+    #                         x['created'],
+    #                         ),
+    #          reverse=True)
+    data.sort(key=lambda x: (
+                             (get_earliest_due(tasks, x, 'in 2 days', filters=filters) == None),
+                             #(get_earliest_due(tasks, x, 'in 2 days', filters=filters)),
                              (has_tag(x, 'group') and len(get_children(x, filters)) == 0),
-                             0 if x['gauge'] == None else x['gauge'],
-                             -len(get_pending_children(data, x)),
+                             (0 if x['gauge'] == None else x['gauge']),
                             ))
+    #data.sort(key=lambda x: (is_filtered(x, filters),
+    #                         #get_earliest_due(tasks, x, 'in 2 days', filters=filters) == None,
+    #                         #get_earliest_due(tasks, x, 'in 2 days', filters=filters),
+    #                         #(has_tag(x, 'group') and len(get_pending_children_single(x)) == 0),
+    #                         #not((has_tag(x, 'group') and len(get_children(x, filters)) == 0)),
+    #                         0 if x['gauge'] == None else x['gauge'],
+    #                         -len(get_pending_children(data, x)),
+    #                        ))
 
 
 def get_rel_time_text(date):
@@ -144,10 +157,14 @@ def get_earliest_due(tasks, task, limit=None, filters=[]):
     children = [i for i in tasks.values() if i['parent'] == task['uuid'] and i['status'] == None]
     children = [i for i in children if not is_filtered(i, filters)]
     cur_due = dateutil.parser.parse(task['due']) if task['due'] != None else None
-    if (cur_due == None or limit != None and cur_due <= cal.parseDT(limit, now)[0]) and len(children) == 0:
-        return cur_due
+    cur_start = dateutil.parser.parse(task['start']) if task['start'] != None else None
+    if len(children) == 0:
+        if cur_start != None and cur_start >= now:
+            return None
+        if cur_due == None or limit != None and cur_due <= cal.parseDT(limit, now)[0]:
+            return cur_due
 
-    dues = [get_earliest_due(tasks, i) for i in children]
+    dues = [get_earliest_due(tasks, i, limit, filters) for i in children]
     dues = [i for i in dues if i != None]
     if cur_due != None:
         dues = [cur_due] + dues
@@ -434,6 +451,8 @@ while True:
         'defrag': None,
         'clear': None,
     })
+    data = []
+    tasks = {}
     s = session.prompt("> ", completer=completer).strip()
     clist = s.split(' ', 1)
     command = clist[0]
@@ -548,13 +567,14 @@ while True:
             write_int(tasks[uuid], 'parent', int(arg))
         con.commit()
     elif command in ['list', 'ls', 'tree']:
+        default_limit = 30 if command == 'tree' else 5
         os.system('clear')
         parser = argparse.ArgumentParser()
         parser.add_argument('--all', action='store_true')
         parser.add_argument('--due', action='store_true')
         parser.add_argument('--blocked', action='store_true')
         parser.add_argument('--nolimit', action='store_true')
-        parser.add_argument('-n', type=int, action='store', default=30)
+        parser.add_argument('-n', type=int, action='store', default=default_limit)
         parser.add_argument('arg', type=str, nargs='*')
         args = parser.parse_args([] if len(clist) == 1 else clist[1].split(' '))
 
@@ -562,7 +582,7 @@ while True:
         sort_filters = [
             (lambda i: (i['status'] != None)),
             #(lambda i: (i['start'] == None and i['due'] != None and dateutil.parser.parse(i['due']) > cal.parseDT('in 2 days', now)[0])),
-            (lambda i: (i['start'] != None and dateutil.parser.parse(i['start']) > cal.parseDT('in 2 days', now)[0])),
+            (lambda i: (i['start'] != None and dateutil.parser.parse(i['start']) > cal.parseDT('in 24 hours', now)[0])),
         ]
 
         filters = sort_filters
@@ -600,12 +620,13 @@ while True:
 
     elif command in ['depends', 'dep']:
         args = [int(i) for i in clist[1].split(' on ')]
-        old_depends = tasks[args[0]]['depends']
-        if old_depends == None:
-            new_depends = '&'+str(args[1])+'&'
-        else:
-            new_depends = old_depends + ' &'+str(args[1])+'&'
-        cur.execute("UPDATE tasks SET depends = '{}' WHERE uuid = {}".format(new_depends, args[0])) 
+        for i in range(1, len(args)):
+            old_depends = tasks[args[i-1]]['depends']
+            if old_depends == None:
+                new_depends = '&'+str(args[i])+'&'
+            else:
+                new_depends = old_depends + ' &'+str(args[i])+'&'
+            cur.execute("UPDATE tasks SET depends = '{}' WHERE uuid = {}".format(new_depends, args[i-1])) 
         con.commit()
 
     elif command in ['tag']:
@@ -630,13 +651,13 @@ while True:
         con.commit()
 
     elif command in ['scry', 'scr', 'bump']:
-        uuid = int(clist[1])
+        uuid = str_to_uuid(clist[1])
         parent = cur.execute('SELECT parent FROM tasks WHERE uuid = {}'.format(uuid)).fetchone()[0]
         if parent == None:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND gauge IS NOT NULL AND uuid != {}'.format(uuid)).fetchall())
+            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
         else:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND gauge IS NOT NULL AND uuid != {}'.format(parent, uuid)).fetchall())
-        gauges = [i[0] for i in gauges]
+            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(parent, uuid)).fetchall())
+        gauges = [i[0] if i[0] != None else 0 for i in gauges]
 
         if command in ['scry', 'scr']:
             if len(gauges) == 0:
