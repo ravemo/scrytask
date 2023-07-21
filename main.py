@@ -557,7 +557,6 @@ while True:
                     print("Can't remove task with children. Use -r for recursive removal.")
                 else:
                     remove(tasks[uuid])
-            break
             con.commit()
         elif command == 'cat':
             print(tasks[str_to_uuid(clist[1])])
