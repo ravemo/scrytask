@@ -405,6 +405,10 @@ def update_gauge(task, new_gauge):
     for i in get_children(task, []):
         old_gauge_i = 0 if i['gauge'] == None else i['gauge']
         update_gauge(i, old_gauge_i + delta_gauge)
+
+
+def has_started(task, curtime):
+    return (task['start'] == None or dateutil.parser.parse(task['start']) <= curtime)
     
 
 
@@ -425,6 +429,7 @@ while True:
         'rename': None,
         'redef': None,
         'done': task_descs,
+        'undone': task_descs,
         'setstart': None,
         'setdue': None,
         'setrepeat': None,
@@ -513,6 +518,10 @@ while True:
             print('Completed "' + task['desc'] + '".')
             write_str(task, 'status', str(now))
         con.commit()
+    elif command == 'undone':
+        task = tasks[str_to_uuid(clist[1])]
+        write_str(task, 'status', None)
+        con.commit()
     elif command in ['setstart', 'start']:
         args = clist[1].split(' ', 1)
         task = tasks[int(args[0])]
@@ -576,7 +585,7 @@ while True:
         justw = max([len(str(i)) for i in tasks.keys()])
         sort_filters = [
             (lambda i: (i['status'] != None)),
-            (lambda i: (i['start'] != None and dateutil.parser.parse(i['start']) > cal.parseDT('in 24 hours', now)[0])),
+            (lambda i: not has_started(i, cal.parseDT('in 24 hours', now)[0])),
         ]
 
         filters = sort_filters
@@ -608,7 +617,16 @@ while True:
         else:
             filtered = [i for i in filtered if not is_filtered(i, filters)]
             sort_tasks(filtered, sort_filters)
-            filtered = filtered[:limit]
+            remaining = limit
+            stop_idx = limit
+            for k, i in enumerate(filtered):
+                if get_earliest_due(tasks, i) != None or not has_started(i, now):
+                    continue
+                remaining -= 1
+                if remaining == 0:
+                    stop_idx = k+1
+
+            filtered = filtered[:stop_idx]
             for i in filtered:
                 print(HTML(str(i['uuid']).ljust(justw) + ' | ' + stringify(i, tasks, True)))
 
