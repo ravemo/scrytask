@@ -55,24 +55,16 @@ def is_filtered(x, filters):
     return True in [i(x) for i in filters]
 
 def sort_tasks(data, filters):
-    #data.sort(key=lambda x: (x['created'] == None,
-    #                         x['created'],
-    #                         ),
-    #          reverse=True)
+    data.sort(key=lambda x: (x['created'] == None,
+                             x['created'],
+                             ),
+              reverse=True)
     data.sort(key=lambda x: (
                              (get_earliest_due(tasks, x, 'in 2 days', filters=filters) == None),
-                             #(get_earliest_due(tasks, x, 'in 2 days', filters=filters)),
+                             (get_earliest_due(tasks, x, 'in 2 days', filters=filters)),
                              (has_tag(x, 'group') and len(get_children(x, filters)) == 0),
                              (0 if x['gauge'] == None else x['gauge']),
                             ))
-    #data.sort(key=lambda x: (is_filtered(x, filters),
-    #                         #get_earliest_due(tasks, x, 'in 2 days', filters=filters) == None,
-    #                         #get_earliest_due(tasks, x, 'in 2 days', filters=filters),
-    #                         #(has_tag(x, 'group') and len(get_pending_children_single(x)) == 0),
-    #                         #not((has_tag(x, 'group') and len(get_children(x, filters)) == 0)),
-    #                         0 if x['gauge'] == None else x['gauge'],
-    #                         -len(get_pending_children(data, x)),
-    #                        ))
 
 
 def get_rel_time_text(date):
@@ -581,7 +573,6 @@ while True:
         justw = max([len(str(i)) for i in tasks.keys()])
         sort_filters = [
             (lambda i: (i['status'] != None)),
-            #(lambda i: (i['start'] == None and i['due'] != None and dateutil.parser.parse(i['due']) > cal.parseDT('in 2 days', now)[0])),
             (lambda i: (i['start'] != None and dateutil.parser.parse(i['start']) > cal.parseDT('in 24 hours', now)[0])),
         ]
 
