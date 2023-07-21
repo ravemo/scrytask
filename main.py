@@ -628,7 +628,7 @@ while True:
                         if remaining == 0:
                             stop_idx = k+1
 
-                filtered = filtered[:stop_idx]
+                    filtered = filtered[:stop_idx]
                 for i in filtered:
                     print(HTML(str(i['uuid']).ljust(justw) + ' | ' + stringify(i, tasks, True)))
 
