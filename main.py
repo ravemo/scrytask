@@ -267,6 +267,7 @@ def assign_uuid(task, _tasks, _depth, _args = None):
 
 def remove(task, _tasks = None, _depth = None, _args = None):
     print('Removing task', task)
+    cur.execute("UPDATE tasks SET depends = replace(depends, '&{}&', '&&')".format(task['uuid'])) 
     cur.execute("DELETE FROM tasks WHERE uuid = {}".format(task['uuid']))
 
 
@@ -545,6 +546,7 @@ while True:
                 print("Can't remove task with children. Use -r for recursive removal.")
             else:
                 remove(tasks[uuid])
+        break
         con.commit()
     elif command == 'cat':
         print(tasks[str_to_uuid(clist[1])])
