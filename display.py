@@ -29,7 +29,7 @@ def stringify(task, fullpath=False):
     tags_str = ' <ansiyellow>' + ' '.join(['#'+i for i in task.tags if i not in ['', 'group', 'collapse']]) + '</ansiyellow>'
 
     suffix = ''
-    if task.has_tag('collapse') and len(task.get_pending_children_single()) > 0:
+    if task.has_tag('collapse') and len(task.get_pending_children()) > 0:
         suffix = " <ansigray>(collapsed)</ansigray>"
 
     if task.has_tag('group'):

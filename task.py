@@ -19,6 +19,8 @@ class Task:
         else:
             self.tags = [i.strip() for i in self.tags.split(' ')]
 
+        if self.status != None:
+            self.status = dateutil.parser.parse(self.status)
         if self.due != None:
             self.due = dateutil.parser.parse(self.due)
         if self.start != None:
@@ -98,6 +100,10 @@ class Task:
         return (self.start == None or self.start <= curtime)
 
 
+    def has_finished_after(self, curtime = datetime.now()):
+        return (self.status != None and self.status >= curtime)
+
+
     def get_earliest_due(self, limit=datetime.now(), filters=[]):
         children = self.get_children(filters)
         if len(children) == 0:
@@ -164,3 +170,7 @@ class Task:
         tags_str = ' '+ ' '.join(self.tags) + ' '
         print("New tags:", "'"+tags_str+"'")
         self.write_str('tags', tags_str)
+
+
+    def get_tags_str(self):
+        return ' '+ ' '.join(self.tags) + ' '
