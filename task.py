@@ -157,6 +157,13 @@ class Task:
         self.write_str('depends', new_depends_str) 
 
 
+    def update_uuid(self, new_uuid):
+        old_uuid = self.uuid
+        self.write_int('uuid', new_uuid)
+        self.cur.execute("UPDATE tasks SET parent = '{}' WHERE parent = {}".format(new_uuid, old_uuid)) 
+        self.cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', ' {} ')".format(old_uuid, new_uuid)) 
+
+
     def update_gauge(self, new_gauge):
         old_gauge = self.gauge
         delta_gauge = new_gauge - old_gauge

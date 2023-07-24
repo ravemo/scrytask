@@ -11,14 +11,15 @@ from task import *
 max_child_shown = 5
 
 def sort_tasks(data, filters):
-    data.sort(key=lambda x: (x.created == None,
+    data.sort(key=lambda x: (x.status == None,
+                             x.status,
+                             x.created == None,
                              x.created,
                              ),
               reverse=True)
     cal = pdt.Calendar()
     limit = cal.parseDT('in 2 days', datetime.now())[0]
-    data.sort(key=lambda x: (x.status == None,
-                             x.status,
+    data.sort(key=lambda x: (x.status != None,
                              (x.get_earliest_due(limit, filters=filters) == None),
                              (x.get_earliest_due(limit, filters=filters)),
                              (x.has_tag('group') and len(x.get_children(filters)) == 0),
@@ -115,16 +116,9 @@ def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=Non
                       'filters': filters})
 
 
-def update_uuid(task, new_uuid):
-    old_uuid = task.uuid
-    task.write_int('uuid', new_uuid)
-    cur.execute("UPDATE tasks SET parent = '{}' WHERE parent = {}".format(new_uuid, old_uuid)) 
-    cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', ' {} ')".format(old_uuid, new_uuid)) 
-
-
 def assign_uuid(task):
-    new_uuid = get_new_uuid(task.status != None)
-    update_uuid(task, new_uuid)
+    new_uuid = get_new_uuid(task.cur, task.status != None)
+    task.update_uuid(new_uuid)
 
 def remove(task, _tasks, _depth, args):
     print('Removing task', task)
@@ -133,6 +127,7 @@ def remove(task, _tasks, _depth, args):
 
 
 def defrag(cur):
+    cal = pdt.Calendar()
     # strip all names if they have whitespaces for some reason
     cur.execute("UPDATE tasks SET desc = trim(desc)")
 
@@ -143,20 +138,19 @@ def defrag(cur):
     for i in tasks:
         k = i.uuid
         if k < 0:
-            update_uuid(i, k+uuid_min-2) # So that we can rewrite the uuids later without conflicts
+            i.update_uuid(k+uuid_min-2) # So that we can rewrite the uuids later without conflicts
         else:
-            update_uuid(i, k+uuid_max+1) # So that we can rewrite the uuids later without conflicts
+            i.update_uuid(k+uuid_max+1) # So that we can rewrite the uuids later without conflicts
 
     tasks = [Task(cur, dict(i)) for i in cur.execute("SELECT * FROM tasks").fetchall()]
     sort_filters = [
         (lambda i: (i.status != None)),
-        (lambda i: not i.has_started(cal.parseDT('in 24 hours', now)[0])),
+        (lambda i: not i.has_started(cal.parseDT('in 24 hours', datetime.now())[0])),
         (lambda i: i.has_pending_dependency()),
     ]
     sort_tasks(tasks, sort_filters)
     for i in tasks:
         assign_uuid(i)
-    con.commit()
 
 
 def split_esc(text, ch):
@@ -164,6 +158,7 @@ def split_esc(text, ch):
 
 
 def parse_new_task(cur, args):
+    cal = pdt.Calendar()
     path = None
     start = None
     due = None
@@ -183,9 +178,9 @@ def parse_new_task(cur, args):
         else:
             due = time
         if start != None:
-            start = cal.parseDT(start, now)[0].isoformat().replace('T', ' ')
+            start = cal.parseDT(start, datetime.now())[0].isoformat().replace('T', ' ')
         if due != None:
-            due = cal.parseDT(due, now)[0].isoformat().replace('T', ' ')
+            due = cal.parseDT(due, datetime.now())[0].isoformat().replace('T', ' ')
         print('start =', start)
         print('due =', due)
         print('repeat =', repeat)

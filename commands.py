@@ -34,6 +34,7 @@ def cmd_redef(cur, args):
 
 
 def cmd_done(cur, args):
+    cal = pdt.Calendar()
     task = get_task(cur, str_to_uuid(cur, args.id))
     repeat = task.repeat
     if repeat != None:
@@ -289,7 +290,7 @@ def load_commands(cur):
 
     for i in ['clear', 'defrag']:
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('ignore', type=str)
+        subparser.add_argument('ignore', type=str, nargs='?')
 
 
 
