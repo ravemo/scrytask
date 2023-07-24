@@ -212,6 +212,7 @@ def cmd_bump(cur, args):
 
 def cmd_defrag(cur, _args):
     defrag(cur)
+    os.system('clear')
 
 def cmd_clear(cur, _args):
     os.system('clear')

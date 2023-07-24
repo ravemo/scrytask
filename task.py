@@ -153,7 +153,7 @@ class Task:
 
     def add_dependency(self, dep):
         self.depends = self.depends + [dep]
-        new_depends_str = ' ' + ' '.join(self.depends) + ' '
+        new_depends_str = ' ' + ' '.join([str(i) for i in self.depends]) + ' '
         self.write_str('depends', new_depends_str) 
 
 

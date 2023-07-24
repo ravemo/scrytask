@@ -24,7 +24,7 @@ while True:
             break
         elif command == '':
             continue
-        elif command in ['add']:
+        elif command in ['add', 'depends']:
             commands.call_cmd(cur, command, clist[1:])
             con.commit()
         elif command in ['due', 'start', 'repeat']:
