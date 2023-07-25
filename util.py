@@ -83,7 +83,7 @@ def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
 
     # Apply functions depth-first if applicable
     if not breadthfirst and task.uuid != None and depth >= 0:
-        func(task, tasks, depth)
+        func(task, tasks, depth, args)
         if args.get('limit', [None])[0] != None:
             args['limit'][0] -= 1
 

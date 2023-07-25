@@ -19,6 +19,9 @@ while True:
     clist = s.split(' ', 1)
     command = clist[0]
 
+    aliases = {'dep': 'depends', 'scr': 'scry'}
+    command = aliases.get(command, command)
+
     try:
         if command in ['exit', 'quit', 'q']:
             break

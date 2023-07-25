@@ -87,7 +87,9 @@ def cmd_rm(cur, args):
     uuid = str_to_uuid(cur, ' '.join(args.arg))
     task = get_task(cur, uuid)
     if args.r:
-        exec_recursively(task, tasks.values(), 0, remove, {'cur': cur}, False)
+        tasks = cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()
+        tasks = [Task(cur, dict(i)) for i in tasks]
+        exec_recursively(task, tasks, 0, remove, {'cur': cur}, False)
     else:
         if len(cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
             print("Can't remove task with children. Use -r for recursive removal.")
