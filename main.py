@@ -1,7 +1,6 @@
 from prompt_toolkit import print_formatted_text as print
 from prompt_toolkit import prompt, PromptSession
 import sqlite3
-#import dateutil.parser
 
 import commands
 

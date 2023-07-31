@@ -325,7 +325,8 @@ def reload_autocomplete(cur):
 
 def call_cmd(cur, cmd, tail):
     if cmd not in all_cmds:
-        print("Unknown command.")
+        print("Unknown command:", '"'+cmd+'"')
+        print(f"{tail=}")
         assert(0)
     args = parser.parse_args([cmd] + tail)
     globals()['cmd_'+cmd](cur, args)
