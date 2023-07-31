@@ -27,13 +27,14 @@ while True:
             break
         elif command == '':
             continue
-        elif command in ['cat', 'scry', 'bump', 'add', 'depends']:
+        elif command in ['cat', 'add', 'depends']:
             commands.call_cmd(cur, command, clist[1:])
             con.commit()
         elif command in ['tag']:
             commands.call_cmd(cur, command, clist[1].split(' '))
             con.commit()
-        elif command in ['due', 'start', 'repeat', 'rename', 'redef']:
+        elif command in ['due', 'start', 'repeat', 'rename', 'redef',
+                         'scry', 'bump']:
             commands.call_cmd(cur, command, clist[1].split(' ', 1))
             con.commit()
         else:

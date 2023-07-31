@@ -192,12 +192,16 @@ def cmd_tag(cur, args):
 
 
 def _scry_bump_common(cur, args, which):
-    uuid = str_to_uuid(cur, args.id)
+    uuid = str_to_uuid(cur, ' '.join(args.id))
     task = get_task(cur, uuid)
-    if task.parent == None:
-        gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
+    if args.tree:
+        if task.parent == None:
+            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
+        else:
+            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
     else:
-        gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
+        gauges = list(cur.execute('SELECT gauge FROM tasks'.format(uuid)).fetchall())
+
     gauges = [i[0] if i[0] != None else 0 for i in gauges]
     if which == 'scry':
         max_gauges = max(gauges) if len(gauges) > 0 else 0
@@ -292,9 +296,14 @@ def load_commands(cur):
         subparser.add_argument('uuid', type=int)
         subparser.add_argument('details', type=str, nargs='*')
 
-    for i in ['cat', 'scry', 'bump', 'done', 'undone']:
+    for i in ['cat', 'done', 'undone']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('id', type=str)
+
+    for i in ['scry', 'bump']:
+        subparser = subparsers.add_parser(i)
+        subparser.add_argument('-t', '--tree', action='store_true')
+        subparser.add_argument('id', type=str, nargs='*')
 
     for i in ['clear', 'defrag']:
         subparser = subparsers.add_parser(i)
