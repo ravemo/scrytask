@@ -183,7 +183,7 @@ def cmd_depends(cur, args):
 
 
 def cmd_tag(cur, args):
-    if args.details == None:
+    if args.details == []:
         cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(args.uuid)) 
         return
     tag_list = [i.replace('#', '').strip() for i in args.details]
@@ -282,10 +282,15 @@ def load_commands(cur):
         subparser.add_argument('uuid', type=int)
         subparser.add_argument('details', type=str)
 
-    for i in ['start', 'due', 'repeat', 'tag']:
+    for i in ['start', 'due', 'repeat']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('uuid', type=int)
         subparser.add_argument('details', type=str, nargs='?')
+
+    for i in ['tag']:
+        subparser = subparsers.add_parser(i)
+        subparser.add_argument('uuid', type=int)
+        subparser.add_argument('details', type=str, nargs='*')
 
     for i in ['cat', 'scry', 'bump', 'done', 'undone']:
         subparser = subparsers.add_parser(i)
@@ -299,7 +304,9 @@ def load_commands(cur):
 
 def reload_autocomplete(cur):
     global completer
-    data = cur.execute('select desc from tasks').fetchall()
+    data = cur.execute("SELECT c.desc FROM tasks c LEFT JOIN tasks p ON p.uuid = c.parent "+\
+                       "WHERE c.status IS NULL AND (c.parent IS NULL OR p.tags NOT LIKE '% collapse %')").fetchall()
+
     task_descs = {i['desc']: None for i in data}
     with_auto = {'add', 'done', 'undone', 'rm', 'cat', 'tree', 'list', 'scry', 'bump'}
     completer = NestedCompleter.from_nested_dict(\

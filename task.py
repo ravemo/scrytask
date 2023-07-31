@@ -34,6 +34,20 @@ class Task:
             self.depends = [int(i) for i in self.depends.split(' ') if i != '']
 
 
+    def __str__(self):
+        parent = self.get_parent()
+        parent_str = '' if parent == None else parent.desc+'/'
+        time_desc = []
+        if self.due:
+            time_desc.append('due '+str(self.due))
+        if self.start:
+            time_desc.append('starts '+str(self.start))
+        if self.repeat:
+            time_desc.append('repeats '+str(self.repeat))
+
+        return '('+str(self.uuid)+') "' + parent_str + self.desc + '"' + '\n' + ', '.join(time_desc)
+
+
     def get_parent(self):
         if self.parent == None:
             return None

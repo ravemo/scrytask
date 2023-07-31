@@ -32,6 +32,9 @@ def stringify(task, fullpath=False):
     if task.has_tag('collapse') and len(task.get_pending_children()) > 0:
         suffix = " <ansigray>(collapsed)</ansigray>"
 
+    desc = desc.replace('&', 'amp;')
+    desc = desc.replace('<', '&lt;')
+    desc = desc.replace('>', '&gt;')
     if task.has_tag('group'):
         return '- ' + desc + time_str + tags_str + suffix
     else:

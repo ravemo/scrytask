@@ -74,7 +74,7 @@ def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
         children = children[:args['limit_children']]
 
     # Recursive part
-    if args.get('hidden_function', None) == None or not task.has_tag('collapse'):
+    if depth == -1 or args.get('hidden_function', None) == None or not task.has_tag('collapse'):
         for i in children:
             exec_recursively(i, tasks, depth+1, func, args)
 
