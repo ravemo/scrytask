@@ -46,13 +46,13 @@ class Task:
             time_desc.append('repeats '+str(self.repeat))
 
         dep_desc = None
-        if self.depends != None:
+        if self.depends != []:
             dep_desc = "Depends on "+' '.join([str(i) for i in self.depends])
 
         ret = '('+str(self.uuid)+') "' + parent_str + self.desc + '"'
         if time_desc != []:
             ret += '\n' + ', '.join(time_desc)
-        if dep_desc != []:
+        if dep_desc != None:
             ret += '\n' + dep_desc
         return ret
 
@@ -164,6 +164,9 @@ class Task:
 # Modifiers
 # ------------------------------------------------------------------------------
     def write_str(self, attr, val):
+        if val != None:
+            val = val.replace("'", "''")
+            val = val.replace('"', '""')
         if val == None:
             self.cur.execute("UPDATE tasks SET {} = NULL WHERE uuid = {}".format(attr, self.uuid)) 
         else:

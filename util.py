@@ -214,10 +214,11 @@ def parse_new_task(cur, args):
 
 
 def fetch_task(cur, desc, parent=None):
+    formatted_desc = desc.replace('"', '""').replace("'", "''")
     if parent != None:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE desc='{}' AND parent={}".format(desc, parent)).fetchall())
+        candidates = list(cur.execute("SELECT * FROM tasks WHERE desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
     else:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE desc='{}'".format(desc)).fetchall())
+        candidates = list(cur.execute("SELECT * FROM tasks WHERE desc='{}'".format(formatted_desc)).fetchall())
     if len(candidates) == 0:
         print("ERROR: No task with this name")
         assert(0)
@@ -228,10 +229,11 @@ def fetch_task(cur, desc, parent=None):
         return candidates[0]['uuid']
 
 def fetch_pending_task(cur, desc, parent=None):
+    formatted_desc = desc.replace('"', '""').replace("'", "''")
     if parent != None:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}' AND parent={}".format(desc, parent)).fetchall())
+        candidates = list(cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
     else:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}'".format(desc)).fetchall())
+        candidates = list(cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}'".format(formatted_desc)).fetchall())
     if len(candidates) == 0:
         print("ERROR: No task with this name")
         assert(0)

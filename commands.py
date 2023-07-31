@@ -281,7 +281,7 @@ def load_commands(cur):
         subparser.add_argument('--due', action='store_true')
         subparser.add_argument('--blocked', action='store_true')
         subparser.add_argument('--no-limit', action='store_true')
-        subparser.add_argument('--exclude-tags', type=str, nargs='*', default=[])
+        subparser.add_argument('-x', '--exclude-tags', type=str, nargs='*', default=[])
         subparser.add_argument('--include-tags', type=str, nargs='*')
         subparser.add_argument('--done-after', type=str, action='store')
         subparser.add_argument('-n', type=int, action='store', default=default_limit)
