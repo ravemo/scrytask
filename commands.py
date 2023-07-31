@@ -16,6 +16,7 @@ def cmd_add(cur, args):
     task.write_str('due', task.due)
     task.write_str('repeat', task.repeat)
     task.write_str('tags', task.get_tags_str())
+    task.write_str('depends', task.get_depends_str())
     task.write_str('created', str(datetime.now()))
 
 
@@ -123,6 +124,10 @@ def _list_tree_common(cur, args, command):
 
     sort_filters.append(lambda i: not i.has_started(cal.parseDT('in 24 hours', datetime.now())[0]))
 
+    sort_filters.append(lambda i: (True in [i.has_tag(j) for j in args.exclude_tags]))
+    if args.include_tags != None:
+        sort_filters.append(lambda i: (True not in [i.has_tag(j) for j in args.include_tags]))
+
     filters = sort_filters
 
     if args.blocked:
@@ -177,18 +182,21 @@ def cmd_tree(cur, args):
 
 
 def cmd_depends(cur, args):
-    args = [int(i) for i in args.args.split(' on ')]
+    args = [int(i) for i in args.args.replace(' on ', ' ').split(' ')]
     for i in range(1, len(args)):
         get_task(cur, args[i-1]).add_dependency(args[i])
 
 
 def cmd_tag(cur, args):
-    if args.details == []:
+    if args.clear:
         cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(args.uuid)) 
         return
-    tag_list = [i.replace('#', '').strip() for i in args.details]
-    tag_list = [i for i in tag_list if i != '']
-    get_task(cur, args.uuid).add_tags(tag_list)
+    to_add = [i.replace('#', '').strip() for i in args.add]
+    to_remove = [i.replace('#', '').strip() for i in args.exclude]
+    to_add = [i for i in to_add if i != '']
+    to_remove = [i for i in to_remove if i != '']
+    get_task(cur, args.uuid).add_tags(to_add)
+    get_task(cur, args.uuid).remove_tags(to_remove)
 
 
 def _scry_bump_common(cur, args, which):
@@ -196,11 +204,11 @@ def _scry_bump_common(cur, args, which):
     task = get_task(cur, uuid)
     if args.tree:
         if task.parent == None:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
+            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
         else:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
+            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
     else:
-        gauges = list(cur.execute('SELECT gauge FROM tasks'.format(uuid)).fetchall())
+        gauges = list(cur.execute('SELECT gauge FROM tasks WHERE status IS NULL'.format(uuid)).fetchall())
 
     gauges = [i[0] if i[0] != None else 0 for i in gauges]
     if which == 'scry':
@@ -273,6 +281,8 @@ def load_commands(cur):
         subparser.add_argument('--due', action='store_true')
         subparser.add_argument('--blocked', action='store_true')
         subparser.add_argument('--no-limit', action='store_true')
+        subparser.add_argument('--exclude-tags', type=str, nargs='*', default=[])
+        subparser.add_argument('--include-tags', type=str, nargs='*')
         subparser.add_argument('--done-after', type=str, action='store')
         subparser.add_argument('-n', type=int, action='store', default=default_limit)
         subparser.add_argument('arg', type=str, nargs='*')
@@ -294,7 +304,9 @@ def load_commands(cur):
     for i in ['tag']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('uuid', type=int)
-        subparser.add_argument('details', type=str, nargs='*')
+        subparser.add_argument('-c', '--clear', action='store_true')
+        subparser.add_argument('-x', '--exclude', type=str, nargs='+', default=[])
+        subparser.add_argument('add', type=str, nargs='*')
 
     for i in ['cat', 'done', 'undone']:
         subparser = subparsers.add_parser(i)

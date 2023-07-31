@@ -30,7 +30,7 @@ class Task:
 
         if self.depends == None:
             self.depends = []
-        else:
+        elif type(self.depends) == str:
             self.depends = [int(i) for i in self.depends.split(' ') if i != '']
 
 
@@ -45,7 +45,16 @@ class Task:
         if self.repeat:
             time_desc.append('repeats '+str(self.repeat))
 
-        return '('+str(self.uuid)+') "' + parent_str + self.desc + '"' + '\n' + ', '.join(time_desc)
+        dep_desc = None
+        if self.depends != None:
+            dep_desc = "Depends on "+' '.join([str(i) for i in self.depends])
+
+        ret = '('+str(self.uuid)+') "' + parent_str + self.desc + '"'
+        if time_desc != []:
+            ret += '\n' + ', '.join(time_desc)
+        if dep_desc != []:
+            ret += '\n' + dep_desc
+        return ret
 
 
     def get_parent(self):
@@ -188,10 +197,21 @@ class Task:
 
     def add_tags(self, new_tags):
         self.tags += new_tags
-        tags_str = ' '+ ' '.join(self.tags) + ' '
+        tags_str = ' '+ ' '.join(self.tags).strip() + ' '
+        print("New tags:", "'"+tags_str+"'")
+        self.write_str('tags', tags_str)
+
+
+    def remove_tags(self, to_remove):
+        self.tags = [i for i in self.tags if i not in to_remove]
+        tags_str = ' '+ ' '.join(self.tags).strip() + ' '
         print("New tags:", "'"+tags_str+"'")
         self.write_str('tags', tags_str)
 
 
     def get_tags_str(self):
         return ' '+ ' '.join(self.tags) + ' '
+
+
+    def get_depends_str(self):
+        return ' '+ ' '.join([str(i) for i in self.depends]) + ' '

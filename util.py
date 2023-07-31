@@ -187,6 +187,12 @@ def parse_new_task(cur, args):
     else:
         path = args
 
+    splitted = split_esc(path, '<-')
+    path = splitted[0].strip()
+    dep = None
+    if len(splitted) > 1:
+        dep = [str_to_uuid(cur, splitted[1].strip())]
+
     splitted = split_esc(path, '#')
     tags = None
     if len(splitted) > 1:
@@ -200,8 +206,10 @@ def parse_new_task(cur, args):
 
     print(desc)
     desc = desc.replace(r'\@', '@').replace(r'\/', '/').replace(r'\#', '#')
+    desc = desc.replace(r'\<', '<')
     task = {'uuid': get_new_uuid(cur), 'parent': parent_uuid, 'desc': desc,
-            'start': start, 'due': due, 'repeat': repeat, 'tags': tags}
+            'start': start, 'due': due, 'repeat': repeat, 'tags': tags,
+            'depends': dep}
     return task
 
 
