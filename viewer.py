@@ -14,12 +14,15 @@ cur = con.cursor()
 
 parser = argparse.ArgumentParser(prog='scryviewer')
 parser.add_argument('command', type=str)
-parser.add_argument('args', type=str, nargs='*')
 args = parser.parse_args()
+
+words = args.command.split(' ')
+command = words[0]
+tail = [] if len(words) == 0 else words[1:]
 
 wm = pyinotify.WatchManager()
 wm.add_watch('tasks.db', pyinotify.IN_MODIFY)
 notifier = pyinotify.Notifier(wm, timeout=60*1000)
 
 commands.load_commands(cur)
-notifier.loop(callback=lambda n: commands.call_cmd(cur, args.command, args.args))
+notifier.loop(callback=lambda n: commands.call_cmd(cur, command, tail))
