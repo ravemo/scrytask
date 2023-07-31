@@ -7,10 +7,6 @@ import commands
 import time
 import pyinotify
 
-class EventHandler(pyinotify.ProcessEvent):
-    def process(self, event):
-        commands.call_cmd(cur, args.command, args.args)
-
 
 con = sqlite3.connect("file:tasks.db?mode=ro", uri=True)
 con.row_factory = sqlite3.Row
