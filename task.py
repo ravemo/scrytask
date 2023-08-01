@@ -134,7 +134,13 @@ class Task:
 
 
     def has_started(self, curtime = datetime.now()):
-        return (self.start == None or self.start <= curtime)
+        if self.start == None or self.start <= curtime:
+            if self.parent == None:
+                return True
+            else:
+                return self.get_parent().has_started(curtime)
+        else:
+            return False
 
 
     def has_finished_after(self, curtime = datetime.now()):

@@ -170,7 +170,7 @@ def _list_tree_common(ctx, args, command):
             filtered = filtered[:stop_idx]
         for i in filtered:
             justw = max([len(str(i.uuid)) for i in filtered])
-            print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True)))
+            print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True, justw+3)))
     ctx.working_task = get_task(ctx, last_wrktsk)
 
 def cmd_list(ctx, args):
@@ -244,7 +244,7 @@ def cmd_grep(ctx, args):
     sort_tasks(matches, [])
     for i in matches:
         justw = max([len(str(i.uuid)) for i in matches])
-        print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True)))
+        print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True)))
 
 
 def cmd_defrag(ctx, _args):

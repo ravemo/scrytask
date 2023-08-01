@@ -2,11 +2,12 @@ import dateutil.parser
 from datetime import datetime
 import parsedatetime as pdt
 import re
+import shutil
+import textwrap
 
 
-def stringify(task, fullpath=False):
+def stringify(task, fullpath=False, start_x=0):
     ctx = task.ctx
-    middle = 'x' if task.status else ' '
     desc = task.desc
     if fullpath:
         desc = task.get_rel_path()
@@ -34,13 +35,17 @@ def stringify(task, fullpath=False):
     if task.has_tag('collapse') and len(task.get_pending_children()) > 0:
         suffix = " <ansigray>(collapsed)</ansigray>"
 
+    term_size = shutil.get_terminal_size((80, 20))
+    middle = 'x' if task.status else ' '
+    prefix = '- ' if task.has_tag('group') else '- ['+middle+'] '
+    start_x += len(prefix)
+    desc = textwrap.wrap(desc, term_size[0] - start_x)
+    desc = ('\n' + ' '*start_x).join(desc)
+
     desc = desc.replace('&', 'amp;')
     desc = desc.replace('<', '&lt;')
     desc = desc.replace('>', '&gt;')
-    if task.has_tag('group'):
-        return '- ' + desc + time_str + tags_str + suffix
-    else:
-        return '- ['+middle+'] ' + desc + time_str + tags_str + suffix
+    return prefix + desc + time_str + tags_str + suffix
 
 
 def get_due_text(date):
