@@ -4,13 +4,14 @@ import parsedatetime as pdt
 import sqlite3
 
 class Task:
-    def __init__(self, cur, taskdict):
-        keys = list(cur.execute("pragma table_info(tasks)").fetchall())
+    def __init__(self, ctx, taskdict):
+        self.ctx = ctx
+        self.cur = ctx.cur
+        keys = list(self.cur.execute("pragma table_info(tasks)").fetchall())
         keys = [i['name'] for i in keys]
         for i in keys:
             if i not in taskdict.keys():
                 taskdict[i] = None
-        self.cur = cur
         for k, v in taskdict.items():
             exec('self.' + k + ' = v')
         
@@ -61,7 +62,7 @@ class Task:
         if self.parent == None:
             return None
         else:
-            return Task(self.cur, dict(self.cur.execute('SELECT * FROM tasks WHERE uuid = {}'.format(self.parent)).fetchone()))
+            return Task(self.ctx, dict(self.cur.execute('SELECT * FROM tasks WHERE uuid = {}'.format(self.parent)).fetchone()))
 
 
     def has_tag(self, tag):
@@ -73,7 +74,7 @@ class Task:
             l = list(self.cur.execute('select * from tasks where parent IS NULL').fetchall())
         else:
             l = list(self.cur.execute('select * from tasks where parent = {}'.format(self.uuid)).fetchall())
-        l = [Task(self.cur, dict(i)) for i in l]
+        l = [Task(self.ctx, dict(i)) for i in l]
         children = [i for i in l if not i.is_filtered(filters)]
         if filters != []:
             children = [i for i in children if not i.is_filtered(filters)]
@@ -90,7 +91,7 @@ class Task:
         deps = [str(i) for i in self.depends]
         # array of dependecies that have not been completed
         unsatis = list(self.cur.execute('SELECT * FROM tasks WHERE status IS NULL AND uuid IN ({})'.format(', '.join(deps))).fetchall())
-        return [Task(self.cur, dict(i)) for i in unsatis]
+        return [Task(self.ctx, dict(i)) for i in unsatis]
 
 
     def has_pending_dependency(self):

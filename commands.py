@@ -8,10 +8,10 @@ from task import *
 from util import *
 
 
-def cmd_add(cur, args):
-    task = Task(cur, parse_new_task(cur, args.details))
+def cmd_add(ctx, args):
+    task = Task(ctx, parse_new_task(ctx, args.details))
     print(task)
-    cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task.uuid, task.parent, task.desc))
+    ctx.cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task.uuid, task.parent, task.desc))
     task.write_str('start', task.start)
     task.write_str('due', task.due)
     task.write_str('repeat', task.repeat)
@@ -20,23 +20,23 @@ def cmd_add(cur, args):
     task.write_str('created', str(datetime.now()))
 
 
-def cmd_rename(cur, args):
-    new_task = parse_new_task(cur, args.details)
-    get_task(cur, args.uuid).write_str('desc', new_task['desc'])
+def cmd_rename(ctx, args):
+    new_task = parse_new_task(ctx, args.details)
+    get_task(ctx, args.uuid).write_str('desc', new_task['desc'])
 
 
-def cmd_redef(cur, args):
-    old_task = get_task(cur, args.uuid)
-    new_task = parse_new_task(cur, args.details)
+def cmd_redef(ctx, args):
+    old_task = get_task(ctx, args.uuid)
+    new_task = parse_new_task(ctx, args.details)
     old_task.write_str('desc', new_task['desc'])
     old_task.write_str('start', new_task['start'])
     old_task.write_str('due', new_task['due'])
     old_task.write_str('repeat', new_task['repeat'])
 
 
-def cmd_done(cur, args):
+def cmd_done(ctx, args):
     cal = pdt.Calendar()
-    task = get_task(cur, str_to_uuid(cur, args.id))
+    task = get_task(ctx, str_to_uuid(ctx, args.id))
     repeat = task.repeat
     if repeat != None:
         print(repeat)
@@ -59,14 +59,14 @@ def cmd_done(cur, args):
         task.write_str('status', str(datetime.now()))
 
 
-def cmd_undone(cur, args):
-    task = get_task(cur, str_to_uuid(cur, args.id))
+def cmd_undone(ctx, args):
+    task = get_task(ctx, str_to_uuid(ctx, args.id))
     task.write_str('status', None)
 
 
-def _start_due_repeat_common(cur, args, command):
+def _start_due_repeat_common(ctx, args, command):
     cal = pdt.Calendar()
-    task = get_task(cur, args.uuid)
+    task = get_task(ctx, args.uuid)
     if command == 'start' or command == 'due':
         new_val = None if args.details == None else cal.parseDT(args.details, datetime.now())[0]
         print("set new "+command+" to", str(new_val))
@@ -75,35 +75,35 @@ def _start_due_repeat_common(cur, args, command):
         new_repeat = None if args.details == None else args.details
         task.write_str('repeat', args.details)
 
-def cmd_start(cur, args):
-    _start_due_repeat_common(cur, args, 'start')
-def cmd_due(cur, args):
-    _start_due_repeat_common(cur, args, 'due')
-def cmd_repeat(cur, args):
-    _start_due_repeat_common(cur, args, 'repeat')
+def cmd_start(ctx, args):
+    _start_due_repeat_common(ctx, args, 'start')
+def cmd_due(ctx, args):
+    _start_due_repeat_common(ctx, args, 'due')
+def cmd_repeat(ctx, args):
+    _start_due_repeat_common(ctx, args, 'repeat')
 
 
-def cmd_rm(cur, args):
+def cmd_rm(ctx, args):
     recursive = False
-    uuid = str_to_uuid(cur, ' '.join(args.arg))
-    task = get_task(cur, uuid)
+    uuid = str_to_uuid(ctx, ' '.join(args.arg))
+    task = get_task(ctx, uuid)
     if args.r:
-        tasks = cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()
-        tasks = [Task(cur, dict(i)) for i in tasks]
-        exec_recursively(task, tasks, 0, remove, {'cur': cur}, False)
+        tasks = ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()
+        tasks = [Task(ctx, dict(i)) for i in tasks]
+        exec_recursively(task, tasks, 0, remove, {'ctx': ctx}, False)
     else:
-        if len(cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
+        if len(ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
             print("Can't remove task with children. Use -r for recursive removal.")
         else:
-            remove(task, None, None, {'cur': cur})
+            remove(task, None, None, {'ctx': ctx})
 
 
-def cmd_cat(cur, args):
-    print(get_task(cur, str_to_uuid(cur, args.id)))
+def cmd_cat(ctx, args):
+    print(get_task(ctx, str_to_uuid(ctx, args.id)))
 
 
-def cmd_mv(cur, args):
-    task = get_task(cur, args.uuid)
+def cmd_mv(ctx, args):
+    task = get_task(ctx, args.uuid)
     if args.dst == '..':
         task.write_int('parent', task.get_parent().parent)
     elif args.dst == '/':
@@ -112,7 +112,7 @@ def cmd_mv(cur, args):
         task.write_int('parent', int(dst))
 
 
-def _list_tree_common(cur, args, command):
+def _list_tree_common(ctx, args, command):
     cal = pdt.Calendar()
     os.system('clear')
 
@@ -145,18 +145,18 @@ def _list_tree_common(cur, args, command):
         filters = sort_filters
 
     limit = None if args.no_limit else args.n
-    root = None if args.arg == [] else str_to_uuid(cur, ' '.join(args.arg))
+    root = None if args.arg == [] else str_to_uuid(ctx, ' '.join(args.arg))
 
-    data = list(cur.execute('select * from tasks').fetchall())
-    tasks = [Task(cur, dict(i)) for i in data]
+    data = list(ctx.cur.execute('select * from tasks').fetchall())
+    tasks = [Task(ctx, dict(i)) for i in data]
     filtered = [i for i in tasks if i.is_descendant(root)]
 
 
     if command == 'tree':
         if root != None:
-            print_tree(filtered, sort_filters, filters, get_task(cur, root), limit=limit)
+            print_tree(filtered, sort_filters, filters, get_task(ctx, root), limit=limit)
         else:
-            print_tree(filtered, sort_filters, filters, Task(cur, {}), limit=limit)
+            print_tree(filtered, sort_filters, filters, Task(ctx, {}), limit=limit)
     else:
         filtered = [i for i in filtered if not i.is_filtered(filters)]
         sort_tasks(filtered, sort_filters)
@@ -175,40 +175,40 @@ def _list_tree_common(cur, args, command):
             justw = max([len(str(i.uuid)) for i in filtered])
             print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True)))
 
-def cmd_list(cur, args):
-    _list_tree_common(cur, args, 'list')
-def cmd_tree(cur, args):
-    _list_tree_common(cur, args, 'tree')
+def cmd_list(ctx, args):
+    _list_tree_common(ctx, args, 'list')
+def cmd_tree(ctx, args):
+    _list_tree_common(ctx, args, 'tree')
 
 
-def cmd_depends(cur, args):
+def cmd_depends(ctx, args):
     args = [int(i) for i in args.args.replace(' on ', ' ').split(' ')]
     for i in range(1, len(args)):
-        get_task(cur, args[i-1]).add_dependency(args[i])
+        get_task(ctx, args[i-1]).add_dependency(args[i])
 
 
-def cmd_tag(cur, args):
+def cmd_tag(ctx, args):
     if args.clear:
-        cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(args.uuid)) 
+        ctx.cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(args.uuid)) 
         return
     to_add = [i.replace('#', '').strip() for i in args.add]
     to_remove = [i.replace('#', '').strip() for i in args.exclude]
     to_add = [i for i in to_add if i != '']
     to_remove = [i for i in to_remove if i != '']
-    get_task(cur, args.uuid).add_tags(to_add)
-    get_task(cur, args.uuid).remove_tags(to_remove)
+    get_task(ctx, args.uuid).add_tags(to_add)
+    get_task(ctx, args.uuid).remove_tags(to_remove)
 
 
-def _scry_bump_common(cur, args, which):
-    uuid = str_to_uuid(cur, ' '.join(args.id))
-    task = get_task(cur, uuid)
+def _scry_bump_common(ctx, args, which):
+    uuid = str_to_uuid(ctx, ' '.join(args.id))
+    task = get_task(ctx, uuid)
     if args.tree:
         if task.parent == None:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
+            gauges = list(ctx.cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
         else:
-            gauges = list(cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
+            gauges = list(ctx.cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
     else:
-        gauges = list(cur.execute('SELECT gauge FROM tasks WHERE status IS NULL'.format(uuid)).fetchall())
+        gauges = list(ctx.cur.execute('SELECT gauge FROM tasks WHERE status IS NULL'.format(uuid)).fetchall())
 
     gauges = [i[0] if i[0] != None else 0 for i in gauges]
     if which == 'scry':
@@ -218,17 +218,35 @@ def _scry_bump_common(cur, args, which):
         min_gauges = min(gauges) if len(gauges) > 0 else 0
         task.update_gauge(min_gauges-1)
 
-def cmd_scry(cur, args):
-    _scry_bump_common(cur, args, 'scry')
+def cmd_scry(ctx, args):
+    _scry_bump_common(ctx, args, 'scry')
 
-def cmd_bump(cur, args):
-    _scry_bump_common(cur, args, 'bump')
+def cmd_bump(ctx, args):
+    _scry_bump_common(ctx, args, 'bump')
 
-def cmd_defrag(cur, _args):
-    defrag(cur)
+
+def cmd_cd(ctx, args):
+    print(args.id)
+    if args.id == '/':
+        ctx.working_task = None
+    elif args.id == '..':
+        if ctx.wokring_task == None:
+            return None
+        ctx.working_task = ctx.working_task.get_parent().uuid
+    else:
+        ctx.working_task = get_task(ctx, str_to_uuid(ctx, args.id))
+
+
+def cmd_grep(ctx, args):
+    pass
+
+
+def cmd_defrag(ctx, _args):
+    defrag(ctx.cur)
     os.system('clear')
 
-def cmd_clear(cur, _args):
+
+def cmd_clear(_ctx, _args):
     os.system('clear')
 
 
@@ -323,10 +341,10 @@ def load_commands(cur):
 
 
 
-def reload_autocomplete(cur):
+def reload_autocomplete(ctx):
     global completer
-    data = cur.execute("SELECT c.desc FROM tasks c LEFT JOIN tasks p ON p.uuid = c.parent "+\
-                       "WHERE c.status IS NULL AND (c.parent IS NULL OR p.tags NOT LIKE '% collapse %')").fetchall()
+    data = ctx.cur.execute("SELECT c.desc FROM tasks c LEFT JOIN tasks p ON p.uuid = c.parent "+\
+                           "WHERE c.status IS NULL AND (c.parent IS NULL OR p.tags NOT LIKE '% collapse %')").fetchall()
 
     task_descs = {i['desc']: None for i in data}
     with_auto = {'add', 'done', 'undone', 'rm', 'cat', 'tree', 'list', 'scry', 'bump'}
@@ -335,10 +353,10 @@ def reload_autocomplete(cur):
         {i: None for i in all_cmds - with_auto})
 
 
-def call_cmd(cur, cmd, tail):
+def call_cmd(ctx, cmd, tail):
     if cmd not in all_cmds:
         print("Unknown command:", '"'+cmd+'"')
         print(f"{tail=}")
         assert(0)
     args = parser.parse_args([cmd] + tail)
-    globals()['cmd_'+cmd](cur, args)
+    globals()['cmd_'+cmd](ctx, args)

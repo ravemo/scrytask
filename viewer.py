@@ -4,6 +4,7 @@
 import sqlite3
 import argparse
 import commands
+import context
 import time
 import pyinotify
 
@@ -25,4 +26,5 @@ wm.add_watch('tasks.db', pyinotify.IN_MODIFY)
 notifier = pyinotify.Notifier(wm, timeout=60*1000)
 
 commands.load_commands(cur)
-notifier.loop(callback=lambda n: commands.call_cmd(cur, command, tail))
+ctx = context.Context(cur)
+notifier.loop(callback=lambda n: commands.call_cmd(ctx, command, tail))

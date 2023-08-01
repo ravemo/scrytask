@@ -117,21 +117,21 @@ def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=Non
 
 
 def assign_uuid(task):
-    new_uuid = get_new_uuid(task.cur, task.status != None)
+    new_uuid = get_new_uuid(task.ctx, task.status != None)
     task.update_uuid(new_uuid)
 
 def remove(task, _tasks, _depth, args):
     print('Removing task', task)
-    args['cur'].execute("UPDATE tasks SET depends = replace(depends, ' {} ', '  ')".format(task.uuid)) 
-    args['cur'].execute("DELETE FROM tasks WHERE uuid = {}".format(task.uuid))
+    args['ctx'].cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', '  ')".format(task.uuid)) 
+    args['ctx'].cur.execute("DELETE FROM tasks WHERE uuid = {}".format(task.uuid))
 
 
-def defrag(cur):
+def defrag(ctx):
     cal = pdt.Calendar()
     # strip all names if they have whitespaces for some reason
-    cur.execute("UPDATE tasks SET desc = trim(desc)")
+    ctx.cur.execute("UPDATE tasks SET desc = trim(desc)")
 
-    tasks = [Task(cur, dict(i)) for i in cur.execute("SELECT * FROM tasks").fetchall()]
+    tasks = [Task(ctx, dict(i)) for i in ctx.cur.execute("SELECT * FROM tasks").fetchall()]
     uuids = [i.uuid for i in tasks]
     uuid_max = max(uuids)
     uuid_min = min(uuids)
@@ -142,7 +142,7 @@ def defrag(cur):
         else:
             i.update_uuid(k+uuid_max+1) # So that we can rewrite the uuids later without conflicts
 
-    tasks = [Task(cur, dict(i)) for i in cur.execute("SELECT * FROM tasks").fetchall()]
+    tasks = [Task(ctx, dict(i)) for i in ctx.cur.execute("SELECT * FROM tasks").fetchall()]
     sort_filters = [
         (lambda i: (i.status != None)),
         (lambda i: not i.has_started(cal.parseDT('in 24 hours', datetime.now())[0])),
@@ -157,7 +157,7 @@ def split_esc(text, ch):
     return re.split(r'(?<!\\)'+ch, text)
 
 
-def parse_new_task(cur, args):
+def parse_new_task(ctx, args):
     cal = pdt.Calendar()
     path = None
     start = None
@@ -191,7 +191,7 @@ def parse_new_task(cur, args):
     path = splitted[0].strip()
     dep = None
     if len(splitted) > 1:
-        dep = [str_to_uuid(cur, splitted[1].strip())]
+        dep = [str_to_uuid(ctx, splitted[1].strip())]
 
     splitted = split_esc(path, '#')
     tags = None
@@ -201,24 +201,24 @@ def parse_new_task(cur, args):
         tags = ', '.join(tags)
     
     splitted = split_esc(path, '/')
-    parent_uuid = None if len(splitted) == 1 else str_to_uuid(cur, '/'.join(splitted[:-1]))
+    parent_uuid = None if len(splitted) == 1 else str_to_uuid(ctx, '/'.join(splitted[:-1]))
     desc = splitted[-1].strip()
 
     print(desc)
     desc = desc.replace(r'\@', '@').replace(r'\/', '/').replace(r'\#', '#')
     desc = desc.replace(r'\<', '<')
-    task = {'uuid': get_new_uuid(cur), 'parent': parent_uuid, 'desc': desc,
+    task = {'uuid': get_new_uuid(ctx.cur), 'parent': parent_uuid, 'desc': desc,
             'start': start, 'due': due, 'repeat': repeat, 'tags': tags,
             'depends': dep}
     return task
 
 
-def fetch_task(cur, desc, parent=None):
+def fetch_task(ctx, desc, parent=None):
     formatted_desc = desc.replace('"', '""').replace("'", "''")
     if parent != None:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
+        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
     else:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE desc='{}'".format(formatted_desc)).fetchall())
+        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE desc='{}'".format(formatted_desc)).fetchall())
     if len(candidates) == 0:
         print("ERROR: No task with this name")
         assert(0)
@@ -228,12 +228,19 @@ def fetch_task(cur, desc, parent=None):
     else:
         return candidates[0]['uuid']
 
-def fetch_pending_task(cur, desc, parent=None):
+def fetch_pending_task(ctx, desc, parent=None):
+    if desc == '..':
+        task_parent = get_working_task().get_parent()
+        if task_parent == None:
+            return None
+        else:
+            return task_parent.uuid
+
     formatted_desc = desc.replace('"', '""').replace("'", "''")
     if parent != None:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
+        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
     else:
-        candidates = list(cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}'".format(formatted_desc)).fetchall())
+        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}'".format(formatted_desc)).fetchall())
     if len(candidates) == 0:
         print("ERROR: No task with this name")
         assert(0)
@@ -244,7 +251,7 @@ def fetch_pending_task(cur, desc, parent=None):
         return candidates[0]['uuid']
 
 
-def str_to_uuid(cur, s, pending_only=True):
+def str_to_uuid(ctx, s, pending_only=True):
     # TODO: Handle cases where there can have two tasks with the same parent
     splitted = split_esc(s, '/')
     if len(splitted) == 1:
@@ -252,17 +259,17 @@ def str_to_uuid(cur, s, pending_only=True):
             return int(splitted[0])
         else:
             if pending_only:
-                return fetch_pending_task(cur, splitted[0])
+                return fetch_pending_task(ctx, splitted[0])
             else:
-                return fetch_task(cur, splitted[0])
+                return fetch_task(ctx, splitted[0])
     else:
-        parent_uuid = str_to_uuid(cur, '/'.join(splitted[:-1]))
+        parent_uuid = str_to_uuid(ctx, '/'.join(splitted[:-1]))
         if pending_only:
-            return fetch_pending_task(cur, splitted[-1], parent_uuid)
+            return fetch_pending_task(ctx, splitted[-1], parent_uuid)
         else:
-            return fetch_task(cur, splitted[-1], parent_uuid)
+            return fetch_task(ctx, splitted[-1], parent_uuid)
 
 
-def get_task(cur, uuid):
-    return Task(cur, dict(cur.execute('SELECT * FROM tasks WHERE uuid={}'.format(uuid)).fetchone()))
+def get_task(ctx, uuid):
+    return Task(ctx, dict(ctx.cur.execute('SELECT * FROM tasks WHERE uuid={}'.format(uuid)).fetchone()))
 
