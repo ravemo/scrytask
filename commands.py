@@ -58,12 +58,13 @@ def cmd_undone(ctx, args):
 def _start_due_repeat_common(ctx, args, command):
     cal = pdt.Calendar()
     task = get_task(ctx, args.uuid)
+    details = ' '.join(args.details)
     if command == 'start' or command == 'due':
-        new_val = None if args.details == None else cal.parseDT(args.details, datetime.now())[0]
+        new_val = None if details == '' else cal.parseDT(details, datetime.now())[0]
         print("set new "+command+" to", str(new_val))
-        task.write_str(command, new_val)
+        task.write_str(command, str(new_val))
     else:
-        new_repeat = None if args.details == None else args.details
+        new_repeat = None if details == '' else details
         task.write_str('repeat', args.details)
 
 def cmd_start(ctx, args):
@@ -120,6 +121,9 @@ def _list_tree_common(ctx, args, command):
         sort_filters.append(lambda i: not i.is_dependent())
     else:
         sort_filters.append(lambda i: i.has_pending_dependency())
+
+    if args.leaf:
+        sort_filters.append(lambda i: len(i.get_pending_children()) > 0)
 
     if command != 'tree':
         sort_filters += [lambda i: i.has_tag('group')]
@@ -298,10 +302,11 @@ def load_commands(cur):
     for i in ['list', 'tree']:
         default_limit = 10 if i == 'tree' else 5
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('--all', action='store_true')
+        subparser.add_argument('-a', '--all', action='store_true')
         subparser.add_argument('--due', action='store_true')
         subparser.add_argument('--blocked', action='store_true')
         subparser.add_argument('--no-limit', action='store_true')
+        subparser.add_argument('-l', '--leaf', action='store_true')
         subparser.add_argument('-x', '--exclude-tags', type=str, nargs='*', default=[])
         subparser.add_argument('--include-tags', type=str, nargs='*')
         subparser.add_argument('--done-after', type=str, action='store')
