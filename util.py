@@ -219,7 +219,6 @@ def parse_new_task(ctx, args):
         parent_uuid = str_to_uuid(ctx, '/'.join(splitted[:-1]))
     desc = splitted[-1].strip()
 
-    print(desc)
     desc = desc.replace(r'\@', '@').replace(r'\/', '/').replace(r'\#', '#')
     desc = desc.replace(r'\<', '<')
     task = {'uuid': get_new_uuid(ctx.cur), 'parent': parent_uuid, 'desc': desc,
