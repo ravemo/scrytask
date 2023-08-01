@@ -17,7 +17,7 @@ session = PromptSession()
 while True:
     commands.reload_autocomplete(ctx)
     working_desc = '/' if ctx.working_task == None else ctx.working_task.desc
-    if len(worki1g_desc) > 20:
+    if len(working_desc) > 20:
         working_desc = working_desc[:18]+'...'
     s = session.prompt("["+working_desc+"] > ", completer=commands.completer).strip()
     clist = s.split(' ')

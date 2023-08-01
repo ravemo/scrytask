@@ -336,7 +336,6 @@ def load_commands(cur):
 
     for i in ['reset', 'defrag']:
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('ignore', type=str, nargs='?')
 
     for i in ['grep']:
         subparser = subparsers.add_parser(i)
