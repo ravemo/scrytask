@@ -102,16 +102,16 @@ def print_tree_line(task, tasks, depth, args = None):
 
     global was_separated, is_first
     prev_sep = was_separated
-    if not is_first:
-        if depth == 0:
-            if task.has_tag('group') or len(task.get_descendants()) >= 2:
+    if depth == 0:
+        if task.has_tag('group') or len(task.get_descendants()) >= 2:
+            if not is_first:
                 print(' '*justw + ' | ')
-                was_separated = True
-            else:
-                was_separated = False
+            was_separated = True
+        else:
+            was_separated = False
 
-        if prev_sep and not was_separated:
-            print(' '*justw + ' | ')
+    if prev_sep and not was_separated and not is_first:
+        print(' '*justw + ' | ')
 
     print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task)))
     is_first = False

@@ -45,6 +45,8 @@ def stringify(task, fullpath=False, start_x=0):
     desc = desc.replace('&', 'amp;')
     desc = desc.replace('<', '&lt;')
     desc = desc.replace('>', '&gt;')
+    if task.has_pending_dependency():
+        suffix += " <ansired>(blocked)</ansired>"
     return prefix + desc + time_str + tags_str + suffix
 
 
