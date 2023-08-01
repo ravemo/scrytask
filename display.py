@@ -5,10 +5,11 @@ import re
 
 
 def stringify(task, fullpath=False):
+    ctx = task.ctx
     middle = 'x' if task.status else ' '
     desc = task.desc
     if fullpath:
-        desc = task.get_full_path()
+        desc = task.get_rel_path()
     start_str = ""
     due_str = ""
     if task.status == None:

@@ -98,13 +98,26 @@ class Task:
         return len(self.get_pending_dependency()) > 0
 
 
-    def get_full_path(self):
+    def get_rel_path(self):
         path = self.desc
         ct = self
-        while ct.parent != None:
+
+        # Move up in the task tree until you get to a task that has both the
+        # working task and current task as descendents
+        common_parent = self.ctx.working_task
+        prefix = ''
+        while common_parent != None and not self.is_descendant(common_parent.uuid):
+            common_parent = common_parent.get_parent()
+            prefix += '../'
+            print(common_parent)
+        common_parent = common_parent.uuid if common_parent else None
+        assert(self.is_descendant(common_parent))
+
+        # Get path from the common ancestor
+        while ct.parent != common_parent:
             ct = ct.get_parent()
             path = ct.desc + '/' + path
-        return path;
+        return prefix + path;
 
 
     def is_dependent(self):
@@ -144,7 +157,7 @@ class Task:
         return min(dues) if len(dues) > 0 else None
 
 
-    def is_descendant(self, root):
+    def is_descendant(self, root: int):
         if self.uuid == root or self.parent == root:
             return True
         elif self.parent == None:

@@ -10,6 +10,13 @@ from task import *
 
 max_child_shown = 5
 
+def is_empty_group(task, filters):
+    if not task.has_tag('group'):
+        return False
+    new_filters = filters + [lambda x: x.has_tag('group')]
+    return len(task.get_descendants(new_filters)) == 0
+
+
 def sort_tasks(data, filters):
     data.sort(key=lambda x: (x.status == None,
                              x.status,
@@ -22,7 +29,7 @@ def sort_tasks(data, filters):
     data.sort(key=lambda x: (x.status != None,
                              (x.get_earliest_due(limit, filters=filters) == None),
                              (x.get_earliest_due(limit, filters=filters)),
-                             (x.has_tag('group') and len(x.get_children(filters)) == 0),
+                             is_empty_group(x, filters),
                              x.gauge,
                             ))
 

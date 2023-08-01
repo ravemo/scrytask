@@ -245,7 +245,7 @@ def cmd_grep(ctx, args):
     sort_tasks(matches, [])
     for i in matches:
         justw = max([len(str(i.uuid)) for i in matches])
-        print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True, ctx)))
+        print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True)))
 
 
 def cmd_defrag(ctx, _args):
