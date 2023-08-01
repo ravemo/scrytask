@@ -27,8 +27,9 @@ def stringify(task, fullpath=False):
                 due_str = ' <ansigreen>(' + due_str + ')</ansigreen>'
     time_str = start_str + due_str
 
-    tags_str = ' <ansiyellow>' + ' '.join(['#'+i for i in task.tags if i not in ['', 'group', 'collapse']]) + '</ansiyellow>'
-
+    tags_str = ' '.join(['#'+i for i in task.tags if i not in ['', 'group', 'collapse']])
+    if tags_str != '':
+        tags_str = ' <ansiyellow>' + tags_str + '</ansiyellow>'
     suffix = ''
     if task.has_tag('collapse') and len(task.get_pending_children()) > 0:
         suffix = " <ansigray>(collapsed)</ansigray>"

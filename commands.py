@@ -145,7 +145,14 @@ def _list_tree_common(ctx, args, command):
         filters = sort_filters
 
     limit = None if args.no_limit else args.n
-    root = None if args.arg == [] else str_to_uuid(ctx, ' '.join(args.arg))
+    if args.arg == []:
+        root = ctx.working_task.uuid if ctx.working_task else None
+    else:
+        root = str_to_uuid(ctx, ' '.join(args.arg))
+
+    # Temporarily change working task to root
+    last_wrktsk = ctx.working_task.uuid if ctx.working_task else None
+    ctx.working_task = get_task(ctx, root)
 
     data = list(ctx.cur.execute('select * from tasks').fetchall())
     tasks = [Task(ctx, dict(i)) for i in data]
@@ -174,6 +181,7 @@ def _list_tree_common(ctx, args, command):
         for i in filtered:
             justw = max([len(str(i.uuid)) for i in filtered])
             print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True)))
+    ctx.working_task = get_task(ctx, last_wrktsk)
 
 def cmd_list(ctx, args):
     _list_tree_common(ctx, args, 'list')

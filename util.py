@@ -268,5 +268,7 @@ def str_to_uuid(ctx, s, pending_only=True):
 
 
 def get_task(ctx, uuid):
+    if uuid == None:
+        return None
     return Task(ctx, dict(ctx.cur.execute('SELECT * FROM tasks WHERE uuid={}'.format(uuid)).fetchone()))
 
