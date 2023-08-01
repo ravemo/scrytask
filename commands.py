@@ -9,7 +9,7 @@ from util import *
 
 
 def cmd_add(ctx, args):
-    task = Task(ctx, parse_new_task(ctx, args.details))
+    task = Task(ctx, parse_new_task(ctx, ' '.join(args.details)))
     print(task)
     ctx.cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task.uuid, task.parent, task.desc))
     task.write_str('start', task.start)
@@ -21,13 +21,13 @@ def cmd_add(ctx, args):
 
 
 def cmd_rename(ctx, args):
-    new_task = parse_new_task(ctx, args.details)
+    new_task = parse_new_task(ctx, ' '.join(args.details))
     get_task(ctx, args.uuid).write_str('desc', new_task['desc'])
 
 
 def cmd_redef(ctx, args):
     old_task = get_task(ctx, args.uuid)
-    new_task = parse_new_task(ctx, args.details)
+    new_task = parse_new_task(ctx, ' '.join(args.details))
     old_task.write_str('desc', new_task['desc'])
     old_task.write_str('start', new_task['start'])
     old_task.write_str('due', new_task['due'])
@@ -36,7 +36,7 @@ def cmd_redef(ctx, args):
 
 def cmd_done(ctx, args):
     cal = pdt.Calendar()
-    task = get_task(ctx, str_to_uuid(ctx, args.id))
+    task = get_task(ctx, str_to_uuid(ctx, ' '.join(args.id)))
     repeat = task.repeat
     if repeat != None:
         print(repeat)
@@ -60,7 +60,7 @@ def cmd_done(ctx, args):
 
 
 def cmd_undone(ctx, args):
-    task = get_task(ctx, str_to_uuid(ctx, args.id))
+    task = get_task(ctx, str_to_uuid(ctx, ' '.join(args.id)))
     task.write_str('status', None)
 
 
@@ -85,7 +85,7 @@ def cmd_repeat(ctx, args):
 
 def cmd_rm(ctx, args):
     recursive = False
-    uuid = str_to_uuid(ctx, ' '.join(args.arg))
+    uuid = str_to_uuid(ctx, ' '.join(args.id))
     task = get_task(ctx, uuid)
     if args.r:
         tasks = ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()
@@ -99,17 +99,12 @@ def cmd_rm(ctx, args):
 
 
 def cmd_cat(ctx, args):
-    print(get_task(ctx, str_to_uuid(ctx, args.id)))
+    print(get_task(ctx, str_to_uuid(ctx, ' '.join(args.id))))
 
 
 def cmd_mv(ctx, args):
     task = get_task(ctx, args.uuid)
-    if args.dst == '..':
-        task.write_int('parent', task.get_parent().parent)
-    elif args.dst == '/':
-        task.write_int('parent', None)
-    else:
-        task.write_int('parent', int(dst))
+    task.write_int('parent', str_to_uuid(ctx, args.dst))
 
 
 def _list_tree_common(ctx, args, command):
@@ -145,10 +140,10 @@ def _list_tree_common(ctx, args, command):
         filters = sort_filters
 
     limit = None if args.no_limit else args.n
-    if args.arg == []:
+    if args.id == []:
         root = ctx.get_working_uuid()
     else:
-        root = str_to_uuid(ctx, ' '.join(args.arg))
+        root = str_to_uuid(ctx, ' '.join(args.id))
 
     # Temporarily change working task to root
     last_wrktsk = ctx.get_working_uuid()
@@ -190,9 +185,10 @@ def cmd_tree(ctx, args):
 
 
 def cmd_depends(ctx, args):
-    args = [int(i) for i in args.args.replace(' on ', ' ').split(' ')]
-    for i in range(1, len(args)):
-        get_task(ctx, args[i-1]).add_dependency(args[i])
+    get_task(ctx, args.dependent).add_dependency(args.dependency[0])
+
+    for i in range(1, len(args.dependency)):
+        get_task(ctx, args.dependency[i-1]).add_dependency(args.dependency[i])
 
 
 def cmd_tag(ctx, args):
@@ -297,12 +293,12 @@ def load_commands(cur):
 
     for i in ['add']:
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('details', type=str)
+        subparser.add_argument('details', type=str, nargs='+')
 
     for i in ['rm']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('-r', action='store_true')
-        subparser.add_argument('arg', type=str, nargs='+')
+        subparser.add_argument('id', type=str, nargs='+')
 
     for i in ['mv']:
         subparser = subparsers.add_parser(i)
@@ -320,21 +316,22 @@ def load_commands(cur):
         subparser.add_argument('--include-tags', type=str, nargs='*')
         subparser.add_argument('--done-after', type=str, action='store')
         subparser.add_argument('-n', type=int, action='store', default=default_limit)
-        subparser.add_argument('arg', type=str, nargs='*')
+        subparser.add_argument('id', type=str, nargs='*')
 
     for i in ['depends']:
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('args', type=str)
+        subparser.add_argument('dependent', type=int)
+        subparser.add_argument('dependency', type=int, nargs='+')
 
     for i in ['rename', 'redef']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('uuid', type=int)
-        subparser.add_argument('details', type=str)
+        subparser.add_argument('details', type=str, nargs='*')
 
     for i in ['start', 'due', 'repeat']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('uuid', type=int)
-        subparser.add_argument('details', type=str, nargs='?')
+        subparser.add_argument('details', type=str, nargs='*')
 
     for i in ['tag']:
         subparser = subparsers.add_parser(i)
@@ -345,7 +342,7 @@ def load_commands(cur):
 
     for i in ['cat', 'done', 'undone']:
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('id', type=str)
+        subparser.add_argument('id', type=str, nargs='*')
 
     for i in ['scry', 'bump']:
         subparser = subparsers.add_parser(i)

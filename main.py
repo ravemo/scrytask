@@ -17,10 +17,10 @@ session = PromptSession()
 while True:
     commands.reload_autocomplete(ctx)
     working_desc = '/' if ctx.working_task == None else ctx.working_task.desc
-    if len(working_desc) > 12:
-        working_desc = working_desc[:10]+'...'
+    if len(worki1g_desc) > 20:
+        working_desc = working_desc[:18]+'...'
     s = session.prompt("["+working_desc+"] > ", completer=commands.completer).strip()
-    clist = s.split(' ', 1)
+    clist = s.split(' ')
     command = clist[0]
 
     aliases = {'dep': 'depends', 'scr': 'scry'}
@@ -31,22 +31,8 @@ while True:
             break
         elif command == '':
             continue
-        elif command in ['cat', 'add', 'depends']:
-            commands.call_cmd(ctx, command, clist[1:])
-            con.commit()
-        elif command in ['tag', 'cd']:
-            commands.call_cmd(ctx, command, clist[1].split(' '))
-            con.commit()
-        elif command in ['due', 'start', 'repeat', 'rename', 'redef',
-                         'scry', 'bump']:
-            commands.call_cmd(ctx, command, clist[1].split(' ', 1))
-            con.commit()
         else:
-            if len(clist) == 1:
-                tail = []
-            else:
-                tail = clist[1].split(' ')
-            commands.call_cmd(ctx, command, tail)
+            commands.call_cmd(ctx, command, clist[1:])
             con.commit()
     except AssertionError:
         print("Assertion not satisfied, cancelling command.")
