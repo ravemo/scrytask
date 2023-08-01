@@ -25,15 +25,6 @@ def cmd_rename(ctx, args):
     get_task(ctx, args.uuid).write_str('desc', new_task['desc'])
 
 
-def cmd_redef(ctx, args):
-    old_task = get_task(ctx, args.uuid)
-    new_task = parse_new_task(ctx, ' '.join(args.details))
-    old_task.write_str('desc', new_task['desc'])
-    old_task.write_str('start', new_task['start'])
-    old_task.write_str('due', new_task['due'])
-    old_task.write_str('repeat', new_task['repeat'])
-
-
 def cmd_done(ctx, args):
     cal = pdt.Calendar()
     task = get_task(ctx, str_to_uuid(ctx, ' '.join(args.id)))
@@ -257,7 +248,7 @@ def cmd_defrag(ctx, _args):
     os.system('clear')
 
 
-def cmd_clear(_ctx, _args):
+def cmd_reset(_ctx, _args):
     os.system('clear')
 
 
@@ -269,7 +260,6 @@ def load_commands(cur):
     subparsers = parser.add_subparsers()
     all_cmds = {'add',
                 'rename',
-                'redef',
                 'done',
                 'undone',
                 'start',
@@ -286,7 +276,7 @@ def load_commands(cur):
                 'scry',
                 'bump',
                 'defrag',
-                'clear',
+                'reset',
                 'cd',
                 'grep',
                 }
@@ -303,7 +293,7 @@ def load_commands(cur):
     for i in ['mv']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('uuid', type=int)
-        subparser.add_argument('dst', type=str)
+        subparser.add_argument('dst', type=str, nargs='+')
 
     for i in ['list', 'tree']:
         default_limit = 10 if i == 'tree' else 5
@@ -323,12 +313,7 @@ def load_commands(cur):
         subparser.add_argument('dependent', type=int)
         subparser.add_argument('dependency', type=int, nargs='+')
 
-    for i in ['rename', 'redef']:
-        subparser = subparsers.add_parser(i)
-        subparser.add_argument('uuid', type=int)
-        subparser.add_argument('details', type=str, nargs='*')
-
-    for i in ['start', 'due', 'repeat']:
+    for i in ['rename', 'start', 'due', 'repeat']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('uuid', type=int)
         subparser.add_argument('details', type=str, nargs='*')
@@ -340,7 +325,7 @@ def load_commands(cur):
         subparser.add_argument('-x', '--exclude', type=str, nargs='+', default=[])
         subparser.add_argument('add', type=str, nargs='*')
 
-    for i in ['cat', 'done', 'undone']:
+    for i in ['cat', 'done', 'undone', 'cd']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('id', type=str, nargs='*')
 
@@ -349,13 +334,9 @@ def load_commands(cur):
         subparser.add_argument('-t', '--tree', action='store_true')
         subparser.add_argument('id', type=str, nargs='*')
 
-    for i in ['clear', 'defrag']:
+    for i in ['reset', 'defrag']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('ignore', type=str, nargs='?')
-
-    for i in ['cd']:
-        subparser = subparsers.add_parser(i)
-        subparser.add_argument('id', type=str, nargs='*')
 
     for i in ['grep']:
         subparser = subparsers.add_parser(i)
