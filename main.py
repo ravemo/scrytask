@@ -16,7 +16,7 @@ session = PromptSession()
 
 while True:
     commands.reload_autocomplete(ctx)
-    working_desc = '/' if ctx.working_task == None else working_task.desc
+    working_desc = '/' if ctx.working_task == None else ctx.working_task.desc
     if len(working_desc) > 12:
         working_desc = working_desc[:10]+'...'
     s = session.prompt("["+working_desc+"] > ", completer=commands.completer).strip()
@@ -34,7 +34,7 @@ while True:
         elif command in ['cat', 'add', 'depends']:
             commands.call_cmd(ctx, command, clist[1:])
             con.commit()
-        elif command in ['tag']:
+        elif command in ['tag', 'cd']:
             commands.call_cmd(ctx, command, clist[1].split(' '))
             con.commit()
         elif command in ['due', 'start', 'repeat', 'rename', 'redef',

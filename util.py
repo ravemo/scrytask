@@ -88,27 +88,32 @@ def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
             args['limit'][0] -= 1
 
 was_separated = False
+is_first = True
 def print_tree_line(task, tasks, depth, args = None):
     justw = max([len(str(i.uuid)) for i in tasks])
     filters = args.get('filters', [])
 
-    global was_separated
+    global was_separated, is_first
     prev_sep = was_separated
-    if depth == 0:
-        if task.has_tag('group') or len(task.get_descendants()) >= 2:
-            print(' '*justw + ' | ')
-            was_separated = True
-        else:
-            was_separated = False
+    if not is_first:
+        if depth == 0:
+            if task.has_tag('group') or len(task.get_descendants()) >= 2:
+                print(' '*justw + ' | ')
+                was_separated = True
+            else:
+                was_separated = False
 
-    if prev_sep and not was_separated:
-        print(' '*justw + ' | ')
+        if prev_sep and not was_separated:
+            print(' '*justw + ' | ')
 
     print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task)))
+    is_first = False
 
 
 def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=None):
     justw = max([len(str(i.uuid)) for i in tasks])
+    global is_first
+    is_first = True
     exec_recursively(root_task, tasks, -1, print_tree_line,
                      {'limit_children': 5, 'sort_filters': sort_filters,
                       'hidden_function': lambda h, d: print(' '*justw + ' | ' + ' '*4*d + str(h) + " tasks hidden."),
@@ -201,7 +206,10 @@ def parse_new_task(ctx, args):
         tags = ', '.join(tags)
     
     splitted = split_esc(path, '/')
-    parent_uuid = None if len(splitted) == 1 else str_to_uuid(ctx, '/'.join(splitted[:-1]))
+    if len(splitted) == 1:
+        parent_uuid = ctx.working_task.uuid if ctx.working_task else None
+    else:
+        parent_uuid = str_to_uuid(ctx, '/'.join(splitted[:-1]))
     desc = splitted[-1].strip()
 
     print(desc)
@@ -214,6 +222,15 @@ def parse_new_task(ctx, args):
 
 
 def fetch_task(ctx, desc, parent=None):
+    if desc == '.':
+        return ctx.working_task.uuid if ctx.working_task else None
+    elif desc == '..':
+        task_parent = ctx.working_task.get_parent()
+        if task_parent == None:
+            return None
+        else:
+            return task_parent.uuid
+
     formatted_desc = desc.replace('"', '""').replace("'", "''")
     if parent != None:
         candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
@@ -229,8 +246,10 @@ def fetch_task(ctx, desc, parent=None):
         return candidates[0]['uuid']
 
 def fetch_pending_task(ctx, desc, parent=None):
-    if desc == '..':
-        task_parent = get_working_task().get_parent()
+    if desc == '.':
+        return ctx.working_task.uuid if ctx.working_task else None
+    elif desc == '..':
+        task_parent = ctx.working_task.get_parent()
         if task_parent == None:
             return None
         else:

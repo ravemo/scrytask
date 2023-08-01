@@ -226,15 +226,15 @@ def cmd_bump(ctx, args):
 
 
 def cmd_cd(ctx, args):
-    print(args.id)
-    if args.id == '/':
+    joined = ' '.join(args.id)
+    if joined == '/':
         ctx.working_task = None
-    elif args.id == '..':
-        if ctx.wokring_task == None:
+    elif joined == '..':
+        if ctx.working_task == None:
             return None
-        ctx.working_task = ctx.working_task.get_parent().uuid
+        ctx.working_task = ctx.working_task.get_parent()
     else:
-        ctx.working_task = get_task(ctx, str_to_uuid(ctx, args.id))
+        ctx.working_task = get_task(ctx, str_to_uuid(ctx, joined))
 
 
 def cmd_grep(ctx, args):
@@ -276,6 +276,8 @@ def load_commands(cur):
                 'bump',
                 'defrag',
                 'clear',
+                'cd',
+                'grep',
                 }
 
     for i in ['add']:
@@ -338,6 +340,10 @@ def load_commands(cur):
     for i in ['clear', 'defrag']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('ignore', type=str, nargs='?')
+
+    for i in ['cd']:
+        subparser = subparsers.add_parser(i)
+        subparser.add_argument('id', type=str, nargs='*')
 
 
 
