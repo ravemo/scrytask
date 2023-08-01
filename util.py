@@ -214,7 +214,7 @@ def parse_new_task(ctx, args):
     
     splitted = split_esc(path, '/')
     if len(splitted) == 1:
-        parent_uuid = ctx.working_task.uuid if ctx.working_task else None
+        parent_uuid = ctx.get_working_uuid()
     else:
         parent_uuid = str_to_uuid(ctx, '/'.join(splitted[:-1]))
     desc = splitted[-1].strip()
@@ -229,7 +229,7 @@ def parse_new_task(ctx, args):
 
 def fetch_task(ctx, desc, parent=None, cond=None):
     if desc == '.':
-        return ctx.working_task.uuid if ctx.working_task else None
+        return ctx.get_working_uuid()
     elif desc == '..':
         task_parent = ctx.working_task.get_parent()
         if task_parent == None:

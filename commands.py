@@ -146,12 +146,12 @@ def _list_tree_common(ctx, args, command):
 
     limit = None if args.no_limit else args.n
     if args.arg == []:
-        root = ctx.working_task.uuid if ctx.working_task else None
+        root = ctx.get_working_uuid()
     else:
         root = str_to_uuid(ctx, ' '.join(args.arg))
 
     # Temporarily change working task to root
-    last_wrktsk = ctx.working_task.uuid if ctx.working_task else None
+    last_wrktsk = ctx.get_working_uuid()
     ctx.working_task = get_task(ctx, root)
 
     data = list(ctx.cur.execute('select * from tasks').fetchall())
