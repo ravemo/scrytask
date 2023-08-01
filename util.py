@@ -129,7 +129,7 @@ def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=Non
 
 
 def assign_uuid(task):
-    new_uuid = get_new_uuid(task.ctx, task.status != None)
+    new_uuid = get_new_uuid(task.ctx.cur, task.status != None)
     task.update_uuid(new_uuid)
 
 def remove(task, _tasks, _depth, args):
@@ -228,7 +228,7 @@ def parse_new_task(ctx, args):
     return task
 
 
-def fetch_task(ctx, desc, parent=None):
+def fetch_task(ctx, desc, parent=None, cond=None):
     if desc == '.':
         return ctx.working_task.uuid if ctx.working_task else None
     elif desc == '..':
@@ -239,34 +239,11 @@ def fetch_task(ctx, desc, parent=None):
             return task_parent.uuid
 
     formatted_desc = desc.replace('"', '""').replace("'", "''")
+    cond_str = cond + "AND " if cond else ''
     if parent != None:
-        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
+        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE {}desc='{}' AND parent={}".format(cond_str, formatted_desc, parent)).fetchall())
     else:
-        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE desc='{}'".format(formatted_desc)).fetchall())
-    if len(candidates) == 0:
-        print("ERROR: No task with this name")
-        assert(0)
-    elif len(candidates) > 1:
-        print("ERROR: Multiple tasks with same name; couldn't decide on correct task.")
-        assert(0)
-    else:
-        return candidates[0]['uuid']
-
-def fetch_pending_task(ctx, desc, parent=None):
-    if desc == '.':
-        return ctx.working_task.uuid if ctx.working_task else None
-    elif desc == '..':
-        task_parent = ctx.working_task.get_parent()
-        if task_parent == None:
-            return None
-        else:
-            return task_parent.uuid
-
-    formatted_desc = desc.replace('"', '""').replace("'", "''")
-    if parent != None:
-        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}' AND parent={}".format(formatted_desc, parent)).fetchall())
-    else:
-        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE status IS NULL and desc='{}'".format(formatted_desc)).fetchall())
+        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE {}desc='{}'".format(cond_str, formatted_desc)).fetchall())
     if len(candidates) == 0:
         print("ERROR: No task with this name")
         assert(0)
@@ -280,20 +257,15 @@ def fetch_pending_task(ctx, desc, parent=None):
 def str_to_uuid(ctx, s, pending_only=True):
     # TODO: Handle cases where there can have two tasks with the same parent
     splitted = split_esc(s, '/')
+    cond = 'status IS NULL' if pending_only else None
     if len(splitted) == 1:
         if splitted[0].replace('-', '').isdigit():
             return int(splitted[0])
         else:
-            if pending_only:
-                return fetch_pending_task(ctx, splitted[0])
-            else:
-                return fetch_task(ctx, splitted[0])
+            return fetch_task(ctx, splitted[0], cond)
     else:
         parent_uuid = str_to_uuid(ctx, '/'.join(splitted[:-1]))
-        if pending_only:
-            return fetch_pending_task(ctx, splitted[-1], parent_uuid)
-        else:
-            return fetch_task(ctx, splitted[-1], parent_uuid)
+        return fetch_task(ctx, splitted[-1], parent_uuid, cond)
 
 
 def get_task(ctx, uuid):

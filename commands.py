@@ -249,7 +249,7 @@ def cmd_grep(ctx, args):
 
 
 def cmd_defrag(ctx, _args):
-    defrag(ctx.cur)
+    defrag(ctx)
     os.system('clear')
 
 
