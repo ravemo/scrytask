@@ -238,7 +238,14 @@ def cmd_cd(ctx, args):
 
 
 def cmd_grep(ctx, args):
-    pass
+    search = ' '.join(args.search)
+    matches = ctx.cur.execute("SELECT * FROM tasks WHERE desc LIKE '%{}%' AND status IS NULL".format(search)).fetchall()
+    matches = [Task(ctx, dict(i)) for i in matches]
+
+    sort_tasks(matches, [])
+    for i in matches:
+        justw = max([len(str(i.uuid)) for i in matches])
+        print(HTML(str(i.uuid).ljust(justw) + ' | ' + stringify(i, True, ctx)))
 
 
 def cmd_defrag(ctx, _args):
@@ -344,6 +351,10 @@ def load_commands(cur):
     for i in ['cd']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('id', type=str, nargs='*')
+
+    for i in ['grep']:
+        subparser = subparsers.add_parser(i)
+        subparser.add_argument('search', type=str, nargs='*')
 
 
 
