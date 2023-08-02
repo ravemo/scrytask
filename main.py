@@ -28,7 +28,7 @@ for i in args.command:
         print("Assertion not satisfied, cancelling command.")
 
 if args.view != '':
-    if args.view == None:
+    if args.view is None:
         args.view = 'list'
 
     if not args.interactive:
@@ -42,7 +42,7 @@ if args.view != '':
         commands.call_cmd(ctx, args.view)
         while True:
             try:
-                working_desc = '/' if ctx.working_task == None else ctx.working_task.desc
+                working_desc = '/' if ctx.working_task is None else ctx.working_task.desc
                 if len(working_desc) > 20:
                     working_desc = working_desc[:18]+'...'
                 s = input("["+working_desc+"] > ")
@@ -59,7 +59,7 @@ else:
 
     while True:
         commands.reload_autocomplete(ctx)
-        working_desc = '/' if ctx.working_task == None else ctx.working_task.desc
+        working_desc = '/' if ctx.working_task is None else ctx.working_task.desc
         if len(working_desc) > 20:
             working_desc = working_desc[:18]+'...'
 

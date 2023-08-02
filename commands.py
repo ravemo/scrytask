@@ -29,17 +29,17 @@ def cmd_done(ctx, args):
     cal = pdt.Calendar()
     task = get_task(ctx, str_to_uuid(ctx, ' '.join(args.id)))
     repeat = task.repeat
-    if repeat != None:
+    if repeat is not None:
         print(repeat)
         repeat = repeat.removeprefix('every ')
         if not (repeat[0:2] == 'a ' or repeat[0].isdigit()):
             repeat = '1 '+repeat
         new_start = None
-        if task.start != None:
+        if task.start is not None:
             new_start = cal.parseDT('in '+repeat, task.start)[0]
-        if task.due != None:
+        if task.due is not None:
             new_due = cal.parseDT('in '+repeat, task.due)[0]
-        if new_start != None:
+        if new_start is not None:
             print('Reset "' + task.desc + '" to ' + str(new_start)+" ~ "+str(new_due))
             task.write_str('start', str(new_start))
         else:
@@ -52,7 +52,7 @@ def cmd_done(ctx, args):
 
 def cmd_undone(ctx, args):
     task = get_task(ctx, str_to_uuid(ctx, ' '.join(args.id)))
-    if task.repeat == None:
+    if task.repeat is None:
         task.write_str('status', None)
         return
     # if task repeats, we should set back the start and due date
@@ -62,11 +62,11 @@ def cmd_undone(ctx, args):
     if not (repeat[0:2] == 'a ' or repeat[0].isdigit()):
         repeat = '1 '+repeat
     new_start = None
-    if task.start != None:
+    if task.start is not None:
         new_start = cal.parseDT(repeat+' ago', task.start)[0]
-    if task.due != None:
+    if task.due is not None:
         new_due = cal.parseDT(repeat+' ago', task.due)[0]
-    if new_start != None:
+    if new_start is not None:
         print('Reset "' + task.desc + '" to ' + str(new_start)+" ~ "+str(new_due))
         task.write_str('start', str(new_start))
     else:
@@ -81,7 +81,7 @@ def _start_due_repeat_common(ctx, args, command):
     if command == 'start' or command == 'due':
         new_val = None if details == '' else cal.parseDT(details, datetime.now())[0]
         print("set new "+command+" to", str(new_val))
-        task.write_str(command, str(new_val))
+        task.write_str(command, new_val)
     else:
         new_repeat = None if details == '' else details
         task.write_str('repeat', args.details)
@@ -122,24 +122,23 @@ def cmd_mv(ctx, args):
 
 def _list_tree_common(ctx, args, command):
     cal = pdt.Calendar()
-    #os.system('clear')
 
     sort_filters = []
-    if args.done_after == None:
-        sort_filters.append(lambda i: (i.status != None))
+    if args.done_after is None:
+        sort_filters.append(lambda i: (i.status is not None))
     else:
-        sort_filters.append(lambda i: not i.has_finished_after(dateutil.parser.parse(args.done_after)))
+        sort_filters.append(lambda i: not i.has_finished_after(dateutil.parser.parse(args.done_after), command=='tree'))
 
     sort_filters.append(lambda i: not i.has_started(cal.parseDT('in 24 hours', datetime.now())[0]))
 
     sort_filters.append(lambda i: (True in [i.has_tag(j) for j in args.exclude_tags]))
-    if args.include_tags != None:
+    if args.include_tags is not None:
         sort_filters.append(lambda i: (True not in [i.has_tag(j) for j in args.include_tags]))
 
     filters = sort_filters
 
     if args.blocked:
-        sort_filters.append(lambda i: not i.is_dependent())
+        sort_filters.append(lambda i: not i.has_pending_dependency())
     else:
         sort_filters.append(lambda i: i.has_pending_dependency())
 
@@ -151,7 +150,7 @@ def _list_tree_common(ctx, args, command):
     if args.all:
         filters = []
     elif args.due:
-        filters = sort_filters + [lambda i: i.get_earliest_due() == None]
+        filters = sort_filters + [lambda i: i.get_earliest_due() is None]
     else:
         filters = sort_filters
 
@@ -170,18 +169,18 @@ def _list_tree_common(ctx, args, command):
     filtered = [i for i in tasks if i.is_descendant(root)]
 
     if command == 'tree':
-        if root != None:
+        if root is not None:
             print_tree(filtered, sort_filters, filters, get_task(ctx, root), limit=limit)
         else:
             print_tree(filtered, sort_filters, filters, Task(ctx, {}), limit=limit)
     else:
         filtered = [i for i in filtered if not i.is_filtered(filters)]
         sort_tasks(filtered, sort_filters)
-        if limit != None:
+        if limit is not None:
             remaining = limit
             stop_idx = limit
             for k, i in enumerate(filtered):
-                if i.get_earliest_due() != None or not i.has_started(datetime.now()):
+                if i.get_earliest_due() is not None or not i.has_started(datetime.now()):
                     continue
                 remaining -= 1
                 if remaining == 0:
@@ -214,8 +213,10 @@ def cmd_tag(ctx, args):
     to_remove = [i.replace('#', '').strip() for i in args.exclude]
     to_add = [i for i in to_add if i != '']
     to_remove = [i for i in to_remove if i != '']
-    get_task(ctx, args.uuid).add_tags(to_add)
-    get_task(ctx, args.uuid).remove_tags(to_remove)
+    task = get_task(ctx, args.uuid)
+    task.add_tags(to_add)
+    task.remove_tags(to_remove)
+    print("New tags:", "'"+task.get_tags_str()+"'")
 
 
 def _scry_bump_common(ctx, args, which):
@@ -223,7 +224,7 @@ def _scry_bump_common(ctx, args, which):
     task = get_task(ctx, uuid)
     cond = ['status IS NULL', 'gauge IS NOT NULL', f'uuid != {uuid}']
     if args.local:
-        if task.parent == None:
+        if task.parent is None:
             cond.append('parent IS NULL')
         else:
             cond.append(f'parent = {task.parent}')
@@ -256,7 +257,7 @@ def cmd_cd(ctx, args):
     if joined == '/':
         ctx.working_task = None
     elif joined == '..':
-        if ctx.working_task == None:
+        if ctx.working_task is None:
             return None
         ctx.working_task = ctx.working_task.get_parent()
     else:

@@ -13,14 +13,14 @@ def stringify(task, fullpath=False, start_x=0):
         desc = task.get_rel_path()
     start_str = ""
     due_str = ""
-    if task.status == None:
-        if task.start != None:
+    if task.status is None:
+        if task.start is not None:
             start_str = get_start_text(task.start)
             if not (start_str.endswith("ago") or start_str.endswith('yesterday')):
                 start_str = ' <ansiblue>(' + start_str + ')</ansiblue>'
             else:
                 start_str = ''
-        if start_str == "" and task.due != None:
+        if start_str == "" and task.due is not None:
             due_str = get_due_text(task.due)
             if due_str.endswith("ago") or due_str.endswith('yesterday'):
                 due_str = ' <ansired>(' + due_str + ')</ansired>'
@@ -64,6 +64,7 @@ def get_start_text(date):
 
 
 def get_rel_time_text(date):
+    """Returns human-readable text of the time left until/passed since date."""
     now = datetime.now()
     delta = date - now
     seconds = 24*60*60-delta.seconds
@@ -94,3 +95,26 @@ def get_rel_time_text(date):
         else:
             return "in " + str(minutes) + min_str, False
 
+
+was_separated = False
+is_first = True
+def print_tree_line(task, tasks, depth, args = None):
+    """Print a single line of a task tree."""
+    justw = max([len(str(i.uuid)) for i in tasks])
+    filters = args.get('filters', [])
+
+    global was_separated, is_first
+    prev_sep = was_separated
+    if depth == 0:
+        if task.has_tag('group') or len(task.get_descendants()) >= 2:
+            if not is_first:
+                print(' '*justw + ' | ')
+            was_separated = True
+        else:
+            was_separated = False
+
+    if prev_sep and not was_separated and not is_first:
+        print(' '*justw + ' | ')
+
+    print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task, False, justw+3+4*depth)))
+    is_first = False

@@ -15,21 +15,21 @@ class Task:
         for k, v in taskdict.items():
             exec('self.' + k + ' = v')
         
-        if self.tags == None:
+        if self.tags is None:
             self.tags = []
         else:
             self.tags = [i.strip() for i in self.tags.split(' ')]
 
-        if self.status != None:
+        if self.status is not None:
             self.status = dateutil.parser.parse(self.status)
-        if self.due != None:
+        if self.due is not None:
             self.due = dateutil.parser.parse(self.due)
-        if self.start != None:
+        if self.start is not None:
             self.start = dateutil.parser.parse(self.start)
 
-        self.gauge = self.gauge if self.gauge != None else 0
+        self.gauge = self.gauge if self.gauge is not None else 0
 
-        if self.depends == None:
+        if self.depends is None:
             self.depends = []
         elif type(self.depends) == str:
             self.depends = [int(i) for i in self.depends.split(' ') if i != '']
@@ -37,7 +37,7 @@ class Task:
 
     def __str__(self):
         parent = self.get_parent()
-        parent_str = '' if parent == None else parent.desc+'/'
+        parent_str = '' if parent is None else parent.desc+'/'
         time_desc = []
         if self.due:
             time_desc.append('due '+str(self.due))
@@ -53,13 +53,13 @@ class Task:
         ret = '('+str(self.uuid)+') "' + parent_str + self.desc + '"'
         if time_desc != []:
             ret += '\n' + ', '.join(time_desc)
-        if dep_desc != None:
+        if dep_desc is not None:
             ret += '\n' + dep_desc
         return ret
 
 
     def get_parent(self):
-        if self.parent == None:
+        if self.parent is None:
             return None
         else:
             return Task(self.ctx, dict(self.cur.execute('SELECT * FROM tasks WHERE uuid = {}'.format(self.parent)).fetchone()))
@@ -70,7 +70,19 @@ class Task:
 
 
     def get_children(self, filters=[]):
-        if self.uuid == None:
+        """Returns all children of current tasks.
+
+        Parameters
+        ----------
+        filters : list
+            Array of functions that takes a task and return whether or not the current task should be filtered out.
+
+        Returns
+        -------
+        list
+            List of children tasks not blocked by filters.
+        """
+        if self.uuid is None:
             l = list(self.cur.execute('select * from tasks where parent IS NULL').fetchall())
         else:
             l = list(self.cur.execute('select * from tasks where parent = {}'.format(self.uuid)).fetchall())
@@ -86,7 +98,8 @@ class Task:
 
 
     def get_pending_dependency(self):
-        if self.depends == None:
+        """Returns all unfinished tasks the current task is dependent on"""
+        if self.depends is None:
             return []
         deps = [str(i) for i in self.depends]
         # array of dependecies that have not been completed
@@ -99,6 +112,7 @@ class Task:
 
 
     def get_rel_path(self):
+        """Returns the path (eg. "../task1/subtask2") relative to the context's working task."""
         path = self.desc
         ct = self
 
@@ -106,7 +120,7 @@ class Task:
         # working task and current task as descendents
         common_parent = self.ctx.working_task
         prefix = ''
-        while common_parent != None and not self.is_descendant(common_parent.uuid):
+        while common_parent is not None and not self.is_descendant(common_parent.uuid):
             common_parent = common_parent.get_parent()
             prefix += '../'
             print(common_parent)
@@ -120,22 +134,17 @@ class Task:
         return prefix + path;
 
 
-    def is_dependent(self):
-        deps = self.get_pending_dependency()
-        return True in [i.is_dependent() for i in deps]
-
-
     def is_filtered(self, filters):
         return True in [i(self) for i in filters]
 
 
     def is_due(self, curtime = datetime.now()):
-        return (self.due == None or self.due <= curtime)
+        return (self.due is None or self.due <= curtime)
 
 
     def has_started(self, curtime = datetime.now()):
-        if self.start == None or self.start <= curtime:
-            if self.parent == None:
+        if self.start is None or self.start <= curtime:
+            if self.parent is None:
                 return True
             else:
                 return self.get_parent().has_started(curtime)
@@ -143,36 +152,45 @@ class Task:
             return False
 
 
-    def has_finished_after(self, curtime = datetime.now()):
-        return (self.status != None and self.status >= curtime)
+    def has_finished_after(self, curtime = datetime.now(), partial=False):
+        """Returns whether the current task has been (partially if partial=True) completed after curtime."""
+        if not partial:
+            return (self.status is not None and self.status >= curtime)
+        # If partial, we check (recursively) whether there is any children
+        # that has also been partially finished after curtime.
+        children = self.get_children()
+        if len(children) == 0:
+            return (self.status is not None and self.status >= curtime)
+        return True in [i.has_finished_after(curtime, True) for i in children]
 
 
     def get_earliest_due(self, limit=datetime.now(), filters=[]):
-        children = self.get_children(filters)
-        if len(children) == 0:
-            if not self.has_started():
-                return None
-            if self.is_due(limit):
-                return self.due
+        """Return the earliest due date of all descendants that have all already started and are not blocked by filters.
+        Any due date after limit is ignored.
+        Returns None if there are no due tasks satisfying our criteria."""
+        descendants = self.get_descendants(filters + [lambda x: x.has_started()])
+        descendants.append(self) # We care about our own due date too
+        dues = []
+        for i in descendants:
+            if i.is_due(limit):
+                dues.append(i.due)
 
-        dues = [i.get_earliest_due(limit, filters) for i in children]
-        dues = [i for i in dues if i != None]
-        if self.due != None:
-            dues = [self.due] + dues
-
+        dues = [i for i in dues if i is not None]
         return min(dues) if len(dues) > 0 else None
 
 
     def is_descendant(self, root: int):
         if self.uuid == root or self.parent == root:
             return True
-        elif self.parent == None:
+        elif self.parent is None:
             return False
         else:
             return self.get_parent().is_descendant(root)
 
 
     def get_descendants(self, filters=[]):
+        # TODO: Do this with a recursive query or at least as many queries as
+        # the depth of the task tree.
         children = self.get_children(filters)
         descendants = children
         for i in children:
@@ -184,24 +202,23 @@ class Task:
 # Modifiers
 # ------------------------------------------------------------------------------
     def write_str(self, attr, val):
-        if val != None:
+        if val is not None:
             val = str(val)
             val = val.replace("'", "''")
             val = val.replace('"', '""')
-        if val == None:
+        if val is None:
             self.cur.execute("UPDATE tasks SET {} = NULL WHERE uuid = {}".format(attr, self.uuid)) 
         else:
             self.cur.execute("UPDATE tasks SET {} = '{}' WHERE uuid = {}".format(attr, val, self.uuid)) 
 
 
     def write_int(self, attr, val):
-        self.cur.execute("UPDATE tasks SET {} = {} WHERE uuid = {}".format(attr, 'NULL' if val == None else val, self.uuid)) 
+        self.cur.execute("UPDATE tasks SET {} = {} WHERE uuid = {}".format(attr, 'NULL' if val is None else val, self.uuid)) 
 
 
     def add_dependency(self, dep):
         self.depends = self.depends + [dep]
-        new_depends_str = ' ' + ' '.join([str(i) for i in self.depends]) + ' '
-        self.write_str('depends', new_depends_str) 
+        self.write_str('depends', self.get_depends_str()) 
 
 
     def update_uuid(self, new_uuid):
@@ -221,20 +238,16 @@ class Task:
 
     def add_tags(self, new_tags):
         self.tags += new_tags
-        tags_str = ' '+ ' '.join(self.tags).strip() + ' '
-        print("New tags:", "'"+tags_str+"'")
-        self.write_str('tags', tags_str)
+        self.write_str('tags', self.get_tags_str())
 
 
     def remove_tags(self, to_remove):
         self.tags = [i for i in self.tags if i not in to_remove]
-        tags_str = ' '+ ' '.join(self.tags).strip() + ' '
-        print("New tags:", "'"+tags_str+"'")
-        self.write_str('tags', tags_str)
+        self.write_str('tags', self.get_tags_str())
 
 
     def get_tags_str(self):
-        return ' '+ ' '.join(self.tags) + ' '
+        return ' '+ ' '.join(self.tags).strip() + ' '
 
 
     def get_depends_str(self):
