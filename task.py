@@ -185,6 +185,7 @@ class Task:
 # ------------------------------------------------------------------------------
     def write_str(self, attr, val):
         if val != None:
+            val = str(val)
             val = val.replace("'", "''")
             val = val.replace('"', '""')
         if val == None:

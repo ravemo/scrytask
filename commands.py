@@ -52,7 +52,26 @@ def cmd_done(ctx, args):
 
 def cmd_undone(ctx, args):
     task = get_task(ctx, str_to_uuid(ctx, ' '.join(args.id)))
-    task.write_str('status', None)
+    if task.repeat == None:
+        task.write_str('status', None)
+        return
+    # if task repeats, we should set back the start and due date
+
+    cal = pdt.Calendar()
+    repeat = task.repeat.removeprefix('every ')
+    if not (repeat[0:2] == 'a ' or repeat[0].isdigit()):
+        repeat = '1 '+repeat
+    new_start = None
+    if task.start != None:
+        new_start = cal.parseDT(repeat+' ago', task.start)[0]
+    if task.due != None:
+        new_due = cal.parseDT(repeat+' ago', task.due)[0]
+    if new_start != None:
+        print('Reset "' + task.desc + '" to ' + str(new_start)+" ~ "+str(new_due))
+        task.write_str('start', str(new_start))
+    else:
+        print('Reset "' + task.desc + '" to ' + str(new_due))
+    task.write_str('due', str(new_due))
 
 
 def _start_due_repeat_common(ctx, args, command):
