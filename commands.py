@@ -150,7 +150,6 @@ def _list_tree_common(ctx, args, command):
     tasks = [Task(ctx, dict(i)) for i in data]
     filtered = [i for i in tasks if i.is_descendant(root)]
 
-
     if command == 'tree':
         if root != None:
             print_tree(filtered, sort_filters, filters, get_task(ctx, root), limit=limit)

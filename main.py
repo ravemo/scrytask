@@ -42,7 +42,10 @@ if args.view != '':
         commands.call_cmd(ctx, args.view)
         while True:
             try:
-                s = input('> ')
+                working_desc = '/' if ctx.working_task == None else ctx.working_task.desc
+                if len(working_desc) > 20:
+                    working_desc = working_desc[:18]+'...'
+                s = input("["+working_desc+"] > ")
                 commands.call_cmd(ctx, s)
                 con.commit()
             except AssertionError:
