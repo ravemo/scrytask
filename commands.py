@@ -90,18 +90,20 @@ def cmd_rm(ctx, args):
             remove(task, None, None, {'ctx': ctx})
 
 
-def cmd_cat(ctx, args):
+def cmd_info(ctx, args):
     print(get_task(ctx, str_to_uuid(ctx, ' '.join(args.id))))
 
 
 def cmd_mv(ctx, args):
     task = get_task(ctx, args.uuid)
-    task.write_int('parent', str_to_uuid(ctx, ' '.join(args.dst)))
+    dst_uuid = str_to_uuid(ctx, ' '.join(args.dst))
+    task.write_int('parent', dst_uuid)
+    print("Moving task '"+task.desc+"' to '"+get_task(ctx, dst_uuid).desc+"'")
 
 
 def _list_tree_common(ctx, args, command):
     cal = pdt.Calendar()
-    os.system('clear')
+    #os.system('clear')
 
     sort_filters = []
     if args.done_after == None:
@@ -256,6 +258,10 @@ def cmd_reset(_ctx, _args):
     os.system('clear')
 
 
+def cmd_quit(_ctx, _args):
+    quit()
+
+
 all_cmds = set()
 completer = None
 def load_commands(cur):
@@ -270,7 +276,7 @@ def load_commands(cur):
                 'due',
                 'repeat',
                 'rm',
-                'cat',
+                'info',
                 'mv',
                 'tree',
                 'list',
@@ -283,6 +289,7 @@ def load_commands(cur):
                 'reset',
                 'cd',
                 'grep',
+                'quit',
                 }
 
     for i in ['add']:
@@ -330,7 +337,7 @@ def load_commands(cur):
         subparser.add_argument('-x', '--exclude', type=str, nargs='+', default=[])
         subparser.add_argument('add', type=str, nargs='*')
 
-    for i in ['cat', 'done', 'undone', 'cd']:
+    for i in ['info', 'done', 'undone', 'cd']:
         subparser = subparsers.add_parser(i)
         subparser.add_argument('id', type=str, nargs='*')
 
@@ -339,7 +346,7 @@ def load_commands(cur):
         subparser.add_argument('-t', '--tree', action='store_true')
         subparser.add_argument('id', type=str, nargs='*')
 
-    for i in ['reset', 'defrag']:
+    for i in ['reset', 'defrag', 'quit']:
         subparser = subparsers.add_parser(i)
 
     for i in ['grep']:
@@ -354,16 +361,26 @@ def reload_autocomplete(ctx):
                            "WHERE c.status IS NULL AND (c.parent IS NULL OR p.tags NOT LIKE '% collapse %')").fetchall()
 
     task_descs = {i['desc']: None for i in data}
-    with_auto = {'add', 'done', 'undone', 'rm', 'cat', 'tree', 'list', 'scry', 'bump'}
+    with_auto = {'add', 'done', 'undone', 'rm', 'info', 'tree', 'list',
+                 'scry', 'bump', 'cd'}
     completer = NestedCompleter.from_nested_dict(\
         {i: task_descs for i in with_auto} | \
         {i: None for i in all_cmds - with_auto})
 
 
-def call_cmd(ctx, cmd, tail):
+def call_cmd(ctx, full_command):
+    full_command = full_command.strip()
+    if full_command == '':
+        return
+
+    aliases = {'dep': 'depends', 'scr': 'scry', 'exit': 'quit', 'q': 'quit'}
+    argv = full_command.split(' ')
+    argv[0] = aliases.get(argv[0], argv[0])
+    cmd = argv[0]
+
     if cmd not in all_cmds:
         print("Unknown command:", '"'+cmd+'"')
-        print(f"{tail=}")
+        print(f"{argv=}")
         assert(0)
-    args = parser.parse_args([cmd] + tail)
+    args = parser.parse_args(argv)
     globals()['cmd_'+cmd](ctx, args)

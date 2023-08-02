@@ -253,6 +253,7 @@ def str_to_uuid(ctx, s, pending_only=True):
             cur_uuid = None
         elif i.replace('-', '').isdigit():
             cur_uuid = int(i)
+            _ = get_task(ctx, cur_uuid) # check if exists
         else:
             cond = ['status IS NULL'] if pending_only else []
             cur_uuid = fetch_task(ctx.cur, i, cur_uuid, cond)
@@ -262,5 +263,10 @@ def str_to_uuid(ctx, s, pending_only=True):
 def get_task(ctx, uuid):
     if uuid == None:
         return None
-    return Task(ctx, dict(ctx.cur.execute('SELECT * FROM tasks WHERE uuid={}'.format(uuid)).fetchone()))
+    matches = ctx.cur.execute('SELECT * FROM tasks WHERE uuid={}'.format(uuid)).fetchall()
+    if len(matches) == 0:
+        print("ERROR: No task with uuid "+str(uuid)+".")
+        assert(0)
+    else:
+        return Task(ctx, dict(matches[0]))
 
