@@ -96,7 +96,7 @@ def cmd_cat(ctx, args):
 
 def cmd_mv(ctx, args):
     task = get_task(ctx, args.uuid)
-    task.write_int('parent', str_to_uuid(ctx, args.dst))
+    task.write_int('parent', str_to_uuid(ctx, ' '.join(args.dst)))
 
 
 def _list_tree_common(ctx, args, command):
