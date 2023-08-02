@@ -113,7 +113,7 @@ def print_tree_line(task, tasks, depth, args = None):
     if prev_sep and not was_separated and not is_first:
         print(' '*justw + ' | ')
 
-    print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task)))
+    print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task, False, justw+3+4*depth)))
     is_first = False
 
 
@@ -190,9 +190,9 @@ def parse_new_task(ctx, args):
         else:
             due = time
         if start != None:
-            start = cal.parseDT(start, datetime.now())[0].isoformat().replace('T', ' ')
+            start = str(cal.parseDT(start, datetime.now())[0])
         if due != None:
-            due = cal.parseDT(due, datetime.now())[0].isoformat().replace('T', ' ')
+            due = str(cal.parseDT(due, datetime.now())[0])
         print('start =', start)
         print('due =', due)
         print('repeat =', repeat)
@@ -220,7 +220,7 @@ def parse_new_task(ctx, args):
     desc = splitted[-1].strip()
 
     desc = desc.replace(r'\@', '@').replace(r'\/', '/').replace(r'\#', '#')
-    desc = desc.replace(r'\<', '<')
+    desc = desc.replace(r'\<', '<').replace(r'\-', '-')
     task = {'uuid': get_new_uuid(ctx.cur), 'parent': parent_uuid, 'desc': desc,
             'start': start, 'due': due, 'repeat': repeat, 'tags': tags,
             'depends': dep}

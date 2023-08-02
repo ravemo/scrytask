@@ -44,11 +44,12 @@ if args.view != '':
             try:
                 s = input('> ')
                 commands.call_cmd(ctx, s)
-                commands.call_cmd(ctx, 'reset')
-                commands.call_cmd(ctx, args.view)
                 con.commit()
             except AssertionError:
                 print("Assertion not satisfied, cancelling command.")
+
+            commands.call_cmd(ctx, 'reset')
+            commands.call_cmd(ctx, args.view)
 
 else:
     session = PromptSession()

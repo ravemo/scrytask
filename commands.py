@@ -203,21 +203,28 @@ def cmd_tag(ctx, args):
 def _scry_bump_common(ctx, args, which):
     uuid = str_to_uuid(ctx, ' '.join(args.id))
     task = get_task(ctx, uuid)
-    if args.tree:
+    cond = ['status IS NULL', 'gauge IS NOT NULL', f'uuid != {uuid}']
+    if args.local:
         if task.parent == None:
-            gauges = list(ctx.cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent IS NULL AND uuid != {}'.format(uuid)).fetchall())
+            cond.append('parent IS NULL')
         else:
-            gauges = list(ctx.cur.execute('SELECT gauge FROM tasks WHERE status IS NULL AND parent = {} AND uuid != {}'.format(task.parent, uuid)).fetchall())
-    else:
-        gauges = list(ctx.cur.execute('SELECT gauge FROM tasks WHERE status IS NULL'.format(uuid)).fetchall())
+            cond.append(f'parent = {task.parent}')
 
-    gauges = [i[0] if i[0] != None else 0 for i in gauges]
-    if which == 'scry':
-        max_gauges = max(gauges) if len(gauges) > 0 else 0
-        task.update_gauge(max_gauges+1)
-    else:
-        min_gauges = min(gauges) if len(gauges) > 0 else 0
-        task.update_gauge(min_gauges-1)
+    cond = ' AND '.join(cond)
+    gauges = [i[0] for i in ctx.cur.execute('SELECT gauge FROM tasks WHERE ' + cond)]
+    add = 1 if which == 'scry' else -1
+    ref = 0
+    if len(gauges) > 0:
+        ref = max(gauges) if which == 'scry' else min(gauges)
+    task.update_gauge(ref + add)
+
+    if args.local:
+        # Keep minimum and maximum gauge of its siblings constant
+        ctx.cur.execute(f'UPDATE tasks SET gauge = gauge - {add} WHERE ' + cond)
+    elif len(gauges) > 0:
+        # Make the minimum gauge be 1 so that every new task is added to the top
+        ctx.cur.execute(f'UPDATE tasks SET gauge = gauge - {min(gauges)} + 1 WHERE ' + cond)
+
 
 def cmd_scry(ctx, args):
     _scry_bump_common(ctx, args, 'scry')
@@ -343,7 +350,7 @@ def load_commands(cur):
 
     for i in ['scry', 'bump']:
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('-t', '--tree', action='store_true')
+        subparser.add_argument('-l', '--local', action='store_true')
         subparser.add_argument('id', type=str, nargs='*')
 
     for i in ['reset', 'defrag', 'quit']:
