@@ -227,44 +227,36 @@ def parse_new_task(ctx, args):
     return task
 
 
-def fetch_task(ctx, desc, parent=None, cond=None):
-    if desc == '.':
-        return ctx.get_working_uuid()
-    elif desc == '..':
-        task_parent = ctx.working_task.get_parent()
-        if task_parent == None:
-            return None
-        else:
-            return task_parent.uuid
-
+def fetch_task(cur, desc, parent=None, cond=[]):
     formatted_desc = desc.replace('"', '""').replace("'", "''")
-    cond_str = cond + "AND " if cond else ''
-    if parent != None:
-        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE {}desc='{}' AND parent={}".format(cond_str, formatted_desc, parent)).fetchall())
-    else:
-        candidates = list(ctx.cur.execute("SELECT * FROM tasks WHERE {}desc='{}'".format(cond_str, formatted_desc)).fetchall())
+    cond.append("desc='{}'".format(formatted_desc))
+    cond.append("parent " + (f"= {parent}" if parent else "IS NULL"))
+    cond_str = " AND ".join(cond)
+
+    candidates = list(cur.execute(f"SELECT uuid FROM tasks WHERE {cond_str}").fetchall())
     if len(candidates) == 0:
-        print("ERROR: No task with this name")
+        print(f"ERROR: No task with the name '{desc}'")
         assert(0)
-    elif len(candidates) > 1:
-        print("ERROR: Multiple tasks with same name; couldn't decide on correct task.")
+    if len(candidates) > 1:
+        print(f"ERROR: Multiple tasks with the name '{desc}'")
         assert(0)
-    else:
-        return candidates[0]['uuid']
+    return candidates[0]['uuid']
 
 
 def str_to_uuid(ctx, s, pending_only=True):
-    # TODO: Handle cases where there can have two tasks with the same parent
     splitted = split_esc(s, '/')
-    cond = 'status IS NULL' if pending_only else None
-    if len(splitted) == 1:
-        if splitted[0].replace('-', '').isdigit():
-            return int(splitted[0])
+    cur_uuid = ctx.get_working_uuid()
+    for i in splitted:
+        if i == '..':
+            cur_uuid = get_task(ctx, cur_uuid).parent
+        elif i == '/':
+            cur_uuid = None
+        elif i.replace('-', '').isdigit():
+            cur_uuid = int(i)
         else:
-            return fetch_task(ctx, splitted[0], cond)
-    else:
-        parent_uuid = str_to_uuid(ctx, '/'.join(splitted[:-1]))
-        return fetch_task(ctx, splitted[-1], parent_uuid, cond)
+            cond = ['status IS NULL'] if pending_only else []
+            cur_uuid = fetch_task(ctx.cur, i, cur_uuid, cond)
+    return cur_uuid
 
 
 def get_task(ctx, uuid):
