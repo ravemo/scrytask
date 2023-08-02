@@ -7,6 +7,15 @@ import textwrap
 
 
 def stringify(task, fullpath=False, start_x=0):
+    """Returns markdown-like string giving all the important information about
+    the task.
+
+    Arguments
+    ---------
+    fullpath : bool
+        Whether to print the full path or just the description.
+    start_x : int
+        Number of characters before the string will be printed. Used for word wrapping"""
     ctx = task.ctx
     desc = task.desc
     if fullpath:
