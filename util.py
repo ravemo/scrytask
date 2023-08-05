@@ -139,10 +139,16 @@ def defrag(ctx):
         assign_uuid(i)
 
 
-def split_esc(text, ch):
+def split_esc(text, ch, maxsplit=0):
     """Splits text by ch but ignoring all ch escaped with a backslash.
     Does not work if ch is a backslash."""
-    return re.split(r'(?<!\\)'+ch, text)
+    return re.split(r'(?<!\\)'+ch, text, maxsplit)
+
+
+def unscape(text, strings):
+    for i in strings:
+        text = text.replace(f'\\{i}', i)
+    return text
 
 
 def parse_new_task(ctx, args):
@@ -150,55 +156,41 @@ def parse_new_task(ctx, args):
     {desc} [<- {dep}] [#{tag_1}] ... [#{tag_n}] [@ [{start}~] {due} [every {repeat}]]
     {} describes variables, [] is optional.
     """
-    # TODO: Use regex to parse this?
+    clean = lambda x: x[0].strip() if x != [] else None
     cal = pdt.Calendar()
+    dep_pattern = re.compile(r".* <- .*")
     path = None
     start = None
     due = None
-    splitted = split_esc(args, '@')
-    repeat = None # can't have non-None if due is None
-    if len(splitted) > 1:
-        path, time = splitted
-        path = path.strip()
-        time = time.strip()
-        if 'every' in time:
-            repeat = 'every ' + time.split('every')[1].strip()
-            time = time.split('every')[0].strip()
-        if '~' in time:
-            start, due = time.split('~')
-            start = start.strip()
-            due = due.strip()
-        else:
-            due = time
-        if start is not None:
-            start = str(cal.parseDT(start, datetime.now())[0])
-        if due is not None:
-            due = str(cal.parseDT(due, datetime.now())[0])
-    else:
-        path = args
 
-    splitted = split_esc(path, '<-')
-    path = splitted[0].strip()
-    dep = None
-    if len(splitted) > 1:
-        dep = [str_to_uuid(ctx, splitted[1].strip())]
+    # TODO: Split first, interpret later
+    timeinfo, start, repeat, dep, due = [], [], [], [], None
+    taskinfo, *timeinfo = split_esc(args, '@', 1)
+    desc_and_tags, *dep = split_esc(taskinfo, '<-', 1)
 
-    splitted = split_esc(path, '#')
-    tags = None
-    if len(splitted) > 1:
-        path, tags = splitted[0], splitted[1:]
-        tags = [i.strip() for i in tags]
-        tags = ', '.join(tags)
+    if timeinfo != []:
+        startdue, *repeat = timeinfo[0].strip().split('every')
+        *start, due = startdue.strip().split('~')
+
+    repeat = 'every ' + clean(repeat) if repeat != [] else None
+    start = clean(start)
+
+    if start != None:
+        start = str(cal.parseDT(start, datetime.now())[0])
+    if due != None:
+        due = str(cal.parseDT(due, datetime.now())[0])
+
+    dep = ' '.join([str(str_to_uuid(ctx, i.strip())) for i in dep])
+
+    desc, *tags = split_esc(desc_and_tags, '#')
+    tags = ' '.join([i.strip() for i in tags])
     
-    splitted = split_esc(path, '/')
-    if len(splitted) == 1:
-        parent_uuid = ctx.get_working_uuid()
-    else:
-        parent_uuid = str_to_uuid(ctx, '/'.join(splitted[:-1]))
-    desc = splitted[-1].strip()
+    # Adding './' before is a nice hack to add to working task by default
+    *parent, newdesc = split_esc('./'+desc, '/')
+    parent = '/'.join(parent)
+    parent_uuid = str_to_uuid(ctx, parent)
 
-    desc = desc.replace(r'\@', '@').replace(r'\/', '/').replace(r'\#', '#')
-    desc = desc.replace(r'\<', '<').replace(r'\-', '-')
+    desc = unscape(desc.strip(), ['@', '/', '#', '<', '-'])
     task = {'uuid': get_new_uuid(ctx.cur), 'parent': parent_uuid, 'desc': desc,
             'start': start, 'due': due, 'repeat': repeat, 'tags': tags,
             'depends': dep}
@@ -227,6 +219,8 @@ def str_to_uuid(ctx, s, pending_only=True):
     splitted = split_esc(s, '/')
     cur_uuid = ctx.get_working_uuid()
     for i in splitted:
+        if i == '.':
+            continue
         if i == '..':
             cur_uuid = get_task(ctx, cur_uuid).parent
         elif i == '/':
