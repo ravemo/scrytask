@@ -12,9 +12,9 @@ max_child_shown = 5
 
 def is_empty_group(task, filters):
     """Check if group has any non-group descendant"""
-    if not task.has_tag('group'):
+    if not task.has_tag('_group'):
         return False
-    new_filters = filters + [lambda x: x.has_tag('group')]
+    new_filters = filters + [lambda x: x.has_tag('_group')]
     return len(task.get_descendants(new_filters)) == 0
 
 
@@ -77,7 +77,7 @@ def exec_recursively(task, tasks, depth, func, **kwargs):
         children = children[:limit_children]
 
     # Recursive part
-    if depth == -1 or kwargs.get('hidden_function', None) is None or not task.has_tag('collapse'):
+    if depth == -1 or kwargs.get('hidden_function', None) is None or not task.has_tag('_collapse'):
         for i in children:
             exec_recursively(i, tasks, depth+1, func, **kwargs)
 

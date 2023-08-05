@@ -40,16 +40,16 @@ def stringify(task, fullpath=False, start_x=0):
                 due_str = ' <ansigreen>(' + due_str + ')</ansigreen>'
     time_str = start_str + due_str
 
-    tags_str = ' '.join(['#'+i for i in task.tags if i not in ['', 'group', 'collapse']])
+    tags_str = ' '.join(['#'+i for i in task.tags if i not in ['', '_group', '_collapse']])
     if tags_str != '':
         tags_str = ' <ansiyellow>' + tags_str + '</ansiyellow>'
     suffix = ''
-    if task.has_tag('collapse') and len(task.get_pending_children()) > 0:
+    if task.has_tag('_collapse') and len(task.get_pending_children()) > 0:
         suffix = " <ansigray>(collapsed)</ansigray>"
 
     term_size = shutil.get_terminal_size((80, 20))
     middle = 'x' if task.status else ' '
-    prefix = '- ' if task.has_tag('group') else '- ['+middle+'] '
+    prefix = '- ' if task.has_tag('_group') else '- ['+middle+'] '
     if start_x > 0:
         start_x += len(prefix)
         desc = textwrap.wrap(desc, term_size[0] - start_x)
@@ -119,7 +119,7 @@ def print_tree_line(task, tasks, depth, args = None):
     global was_separated, is_first
     prev_sep = was_separated
     if depth == 0:
-        if task.has_tag('group') or len(task.get_descendants()) >= 2:
+        if task.has_tag('_group') or len(task.get_descendants()) >= 2:
             if not is_first:
                 print(' '*justw + ' | ')
             was_separated = True

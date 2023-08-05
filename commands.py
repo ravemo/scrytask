@@ -23,8 +23,11 @@ def parse_id_list(cur, idlist):
             else: # If it is not a number, consider them as a pattern matching.
                 # Do a few substitutions to change the unix-like pattern
                 # matching into SQLite pattern matching.
-                pattern = i.replace("'", "''")
-                src_uuids += [j['uuid'] for j in cur.execute(f"""SELECT uuid FROM tasks WHERE status IS NULL AND instr(desc, "{pattern}") != 0""").fetchall()]
+                pattern = i.replace("'", "''").replace('"', '""')
+                pattern = pattern.replace('%', '\\%').replace('_', '\\_')
+                pattern = pattern.replace('*', '%').replace('?', '_')
+
+                src_uuids += [j['uuid'] for j in cur.execute(f"""SELECT uuid FROM tasks WHERE status IS NULL AND desc LIKE "{pattern}" ESCAPE '\\'""").fetchall()]
     return src_uuids
 
 
@@ -72,7 +75,7 @@ class CommandManager:
         for i in ['mv']:
             subparser = self.subparsers.add_parser(i)
             subparser.add_argument('src', type=str, nargs='+')
-            subparser.add_argument('dst', type=int)
+            subparser.add_argument('dst', type=str)
 
         for i in ['list', 'tree']:
             default_limit = 10 if i == 'tree' else 5
@@ -236,9 +239,10 @@ class CommandManager:
 
     def cmd_mv(self, args):
         src_uuids = parse_id_list(self.ctx.cur, args.src)
-        src_uuids_str = '(' + ','.join([str(i) for i in idlist]) + ')'
-        self.ctx.cur.execute(f"UPDATE tasks SET parent={args.dst} WHERE uuid IN {src_uuids_str}")
-        print("Moving tasks "+src_uuids_str+" to '"+get_task(self.ctx, args.dst).desc+"'")
+        src_uuids_str = '(' + ','.join([str(i) for i in src_uuids]) + ')'
+        dst = str_to_uuid(self.ctx, args.dst)
+        self.ctx.cur.execute(f"UPDATE tasks SET parent={dst} WHERE uuid IN {src_uuids_str}")
+        print("Moving tasks "+src_uuids_str+" to '"+get_task(self.ctx, dst).desc+"'")
 
 
     def _list_tree_common(self, args, command):
@@ -268,7 +272,7 @@ class CommandManager:
             sort_filters.append(lambda i: len(i.get_pending_children()) > 0)
 
         if command != 'tree':
-            sort_filters += [lambda i: i.has_tag('group')]
+            sort_filters += [lambda i: i.has_tag('_group')]
         if args.all:
             filters = []
         elif args.due:
@@ -418,7 +422,7 @@ class CommandManager:
 
     def reload_autocomplete(self):
         data = self.ctx.cur.execute("SELECT c.desc FROM tasks c LEFT JOIN tasks p ON p.uuid = c.parent "+
-                                    "WHERE c.status IS NULL AND (c.parent IS NULL OR instr(p.tags, ' collapse ') == 0)").fetchall()
+                                    "WHERE c.status IS NULL AND (c.parent IS NULL OR instr(p.tags, ' _collapse ') == 0)").fetchall()
 
         task_descs = {i['desc']: None for i in data}
         with_auto = {'add', 'done', 'undone', 'rm', 'info', 'tree', 'list',

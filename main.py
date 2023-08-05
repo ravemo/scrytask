@@ -4,6 +4,7 @@ import sqlite3
 import argparse
 import shutil
 import pyinotify
+import platformdirs
 
 from commands import *
 import context
@@ -22,18 +23,41 @@ def prompt_input(session, ctx):
         return session.prompt("["+working_desc+"] > ").strip()
 
 
-con = sqlite3.connect("tasks.db")
-con.row_factory = sqlite3.Row
-cur = con.cursor()
-ctx = context.Context(cur)
+
+def_location = platformdirs.user_data_dir('scrytask', ensure_exists=True)+'/tasks.db'
 
 parser = argparse.ArgumentParser(prog='scrytask')
 parser.add_argument('-i', '--interactive', action='store_true')
 parser.add_argument('-v', '--view', type=str, nargs='?', default='')
 parser.add_argument('-c', '--command', type=str, nargs='+', default=[])
 parser.add_argument('-w', '--whitelist', type=str, default=None)
+parser.add_argument('--database', type=str, default=def_location)
 parser.add_argument('--no-wrap', action='store_true', default=False)
 args = parser.parse_args()
+print("Using database at:", args.database)
+#if not os.path.exists(args.database):
+#    print("Error: File " + args.database + " not found.")
+#    exit(1)
+con = sqlite3.connect(args.database)
+con.row_factory = sqlite3.Row
+cur = con.cursor()
+cur.execute("CREATE TABLE IF NOT EXISTS tasks\
+             (uuid INTEGER PRIMARY KEY,\
+              parent INTEGER,\
+              desc TEXT,\
+              tags TEXT,\
+              status TEXT,\
+              start TEXT,\
+              due TEXT,\
+              repeat TEXT,\
+              gauge REAL,\
+              created TEXT,\
+              depends TEXT)")
+
+
+
+ctx = context.Context(cur)
+
 
 whitelist = None if args.whitelist is None else args.whitelist.split(',')
 commands = CommandManager(ctx, whitelist, args.no_wrap)
