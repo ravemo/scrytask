@@ -4,6 +4,8 @@ import parsedatetime as pdt
 import re
 import shutil
 import textwrap
+from prompt_toolkit import print_formatted_text as print
+from prompt_toolkit import HTML
 
 
 def stringify(task, fullpath=False, start_x=0):

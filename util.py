@@ -1,5 +1,5 @@
 from prompt_toolkit import print_formatted_text as print
-from prompt_toolkit import prompt, HTML, PromptSession
+from prompt_toolkit import prompt, PromptSession
 from datetime import datetime
 import parsedatetime as pdt
 import sqlite3
@@ -120,7 +120,6 @@ def defrag(ctx):
     uuids = [i.uuid for i in tasks]
     uuid_max = max(uuids)
     uuid_min = min(uuids)
-    # TODO Update this part with two queries
     for i in tasks:
         k = i.uuid
         if k < 0:

@@ -2,10 +2,24 @@ from prompt_toolkit import print_formatted_text as print
 from prompt_toolkit import prompt, PromptSession
 import sqlite3
 import argparse
+import shutil
 import pyinotify
 
 import commands
 import context
+
+
+def prompt_input(session, ctx):
+    commands.reload_autocomplete(ctx)
+    working_desc = '/' if ctx.working_task is None else ctx.working_task.desc
+    if len(working_desc) > 20:
+        working_desc = working_desc[:18]+'...'
+
+    term_size = shutil.get_terminal_size((80, 20))
+    if term_size[1] > 8:
+        return session.prompt("["+working_desc+"] > ", completer=commands.completer).strip()
+    else:
+        return session.prompt("["+working_desc+"] > ").strip()
 
 
 con = sqlite3.connect("tasks.db")
@@ -27,6 +41,8 @@ for i in args.command:
     except AssertionError:
         print("Assertion not satisfied, cancelling command.")
 
+session = PromptSession()
+
 if args.view != '':
     if args.view is None:
         args.view = 'list'
@@ -42,10 +58,7 @@ if args.view != '':
         commands.call_cmd(ctx, args.view)
         while True:
             try:
-                working_desc = '/' if ctx.working_task is None else ctx.working_task.desc
-                if len(working_desc) > 20:
-                    working_desc = working_desc[:18]+'...'
-                s = input("["+working_desc+"] > ")
+                s = prompt_input(session, ctx)
                 commands.call_cmd(ctx, s)
                 con.commit()
             except AssertionError:
@@ -53,17 +66,9 @@ if args.view != '':
 
             commands.call_cmd(ctx, 'reset')
             commands.call_cmd(ctx, args.view)
-
 else:
-    session = PromptSession()
-
     while True:
-        commands.reload_autocomplete(ctx)
-        working_desc = '/' if ctx.working_task is None else ctx.working_task.desc
-        if len(working_desc) > 20:
-            working_desc = working_desc[:18]+'...'
-
-        s = session.prompt("["+working_desc+"] > ", completer=commands.completer).strip()
+        s = prompt_input(session, ctx)
         try:
             commands.call_cmd(ctx, s)
             con.commit()

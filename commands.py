@@ -114,10 +114,34 @@ def cmd_info(ctx, args):
 
 
 def cmd_mv(ctx, args):
-    task = get_task(ctx, args.uuid)
-    dst_uuid = str_to_uuid(ctx, ' '.join(args.dst))
-    task.write_int('parent', dst_uuid)
-    print("Moving task '"+task.desc+"' to '"+get_task(ctx, dst_uuid).desc+"'")
+    src_uuids = []
+    if False not in [i.replace('-', '').isdigit() for i in args.src]:
+        # If all strings are numbers, use all of them as uuids
+        src_uuids = [int(i) for i in args.src]
+    else: 
+        # It is possible some of the non-numbers are in the format x..y
+        range_test = [i.split('..') for i in args.src]
+        flattened = [j for i in range_test for j in i]
+        print(f"{flattened=}")
+        if max([len(i) for i in range_test]) == 2 and \
+           False not in [j.replace('-', '').isdigit() for j in flattened]:
+            range_test = [[int(j) for j in i] for i in range_test]
+            src_uuids = [i[0] for i in range_test if len(i) == 1]
+            for i in range_test:
+                if len(i) == 2:
+                    assert(i[1] > i[0])
+                    src_uuids += [j for j in range(i[0], i[1]+1)]
+        else: # If one of them is not a number, consider them as a pattern matching.
+            # Do a few substitutions to change the unix-like pattern matching into
+            # SQLite pattern matching.
+            pattern = ' '.join(args.src).replace("'", "''")
+            pattern = pattern.replace('%', '\\%').replace('_', '\\_')
+            pattern = pattern.replace('*', '%').replace('?', '_')
+            src_uuids = [i['uuid'] for i in ctx.cur.execute(f"""SELECT uuid FROM tasks WHERE desc LIKE "{pattern}" ESCAPE '\\'""").fetchall()]
+
+    src_uuids_str = '(' + ','.join([str(i) for i in src_uuids]) + ')'
+    ctx.cur.execute(f"UPDATE tasks SET parent={args.dst} WHERE uuid IN {src_uuids_str}")
+    print("Moving tasks "+src_uuids_str+" to '"+get_task(ctx, args.dst).desc+"'")
 
 
 def _list_tree_common(ctx, args, command):
@@ -329,8 +353,8 @@ def load_commands(cur):
 
     for i in ['mv']:
         subparser = subparsers.add_parser(i)
-        subparser.add_argument('uuid', type=int)
-        subparser.add_argument('dst', type=str, nargs='+')
+        subparser.add_argument('src', type=str, nargs='+')
+        subparser.add_argument('dst', type=int)
 
     for i in ['list', 'tree']:
         default_limit = 10 if i == 'tree' else 5
