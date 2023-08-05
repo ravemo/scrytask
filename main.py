@@ -32,11 +32,13 @@ parser = argparse.ArgumentParser(prog='ttask')
 parser.add_argument('-i', '--interactive', action='store_true')
 parser.add_argument('-v', '--view', type=str, nargs='?', default='')
 parser.add_argument('-c', '--command', type=str, nargs='+', default=[])
+parser.add_argument('-w', '--whitelist', type=str, default=None)
+parser.add_argument('--no-wrap', action='store_true', default=False)
 args = parser.parse_args()
 
 for i in args.command:
     try:
-        commands.call_cmd(ctx, i)
+        commands.call_cmd(ctx, i, args.whitelist)
         con.commit()
     except AssertionError:
         print("Assertion not satisfied, cancelling command.")
@@ -59,18 +61,18 @@ if args.view != '':
         while True:
             try:
                 s = prompt_input(session, ctx)
-                commands.call_cmd(ctx, s)
+                commands.call_cmd(ctx, s, args.whitelist)
                 con.commit()
             except AssertionError:
                 print("Assertion not satisfied, cancelling command.")
 
             commands.call_cmd(ctx, 'reset')
-            commands.call_cmd(ctx, args.view)
+            commands.call_cmd(ctx, args.view, args.whitelist)
 else:
     while True:
         s = prompt_input(session, ctx)
         try:
-            commands.call_cmd(ctx, s)
+            commands.call_cmd(ctx, s, args.whitelist)
             con.commit()
         except AssertionError:
             print("Assertion not satisfied, cancelling command.")

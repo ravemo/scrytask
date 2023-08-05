@@ -418,7 +418,7 @@ def reload_autocomplete(ctx):
         {i: None for i in all_cmds - with_auto})
 
 
-def call_cmd(ctx, full_command):
+def call_cmd(ctx, full_command, allowed):
     full_command = full_command.strip()
     if full_command == '':
         return
@@ -427,6 +427,9 @@ def call_cmd(ctx, full_command):
     argv = full_command.split(' ')
     argv[0] = aliases.get(argv[0], argv[0])
     cmd = argv[0]
+    if allowed is not None and cmd not in allowed:
+        print("Command now allowed:", cmd)
+        assert(0)
 
     if cmd not in all_cmds:
         print("Unknown command:", '"'+cmd+'"')
