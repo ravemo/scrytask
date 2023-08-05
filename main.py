@@ -5,12 +5,12 @@ import argparse
 import shutil
 import pyinotify
 
-import commands
+from commands import *
 import context
 
 
 def prompt_input(session, ctx):
-    commands.reload_autocomplete(ctx)
+    commands.reload_autocomplete()
     working_desc = '/' if ctx.working_task is None else ctx.working_task.desc
     if len(working_desc) > 20:
         working_desc = working_desc[:18]+'...'
@@ -26,9 +26,8 @@ con = sqlite3.connect("tasks.db")
 con.row_factory = sqlite3.Row
 cur = con.cursor()
 ctx = context.Context(cur)
-commands.load_commands(cur)
 
-parser = argparse.ArgumentParser(prog='ttask')
+parser = argparse.ArgumentParser(prog='scrytask')
 parser.add_argument('-i', '--interactive', action='store_true')
 parser.add_argument('-v', '--view', type=str, nargs='?', default='')
 parser.add_argument('-c', '--command', type=str, nargs='+', default=[])
@@ -36,9 +35,12 @@ parser.add_argument('-w', '--whitelist', type=str, default=None)
 parser.add_argument('--no-wrap', action='store_true', default=False)
 args = parser.parse_args()
 
+whitelist = None if args.whitelist is None else args.whitelist.split(',')
+commands = CommandManager(ctx, whitelist)
+
 for i in args.command:
     try:
-        commands.call_cmd(ctx, i, args.whitelist.split(','))
+        commands.call_cmd(i)
         con.commit()
     except AssertionError:
         print("Assertion not satisfied, cancelling command.")
@@ -53,26 +55,26 @@ if args.view != '':
         wm = pyinotify.WatchManager()
         wm.add_watch('tasks.db', pyinotify.IN_MODIFY)
         notifier = pyinotify.Notifier(wm, timeout=15*60*1000)
-        notifier.loop(callback=lambda n: (commands.call_cmd(ctx, 'reset'),
-                                          commands.call_cmd(ctx, args.view)))
+        notifier.loop(callback=lambda n: (commands.call_cmd('reset'),
+                                          commands.call_cmd(args.view)))
     else:
-        commands.call_cmd(ctx, 'reset')
-        commands.call_cmd(ctx, args.view)
+        commands.call_cmd('reset')
+        commands.call_cmd(args.view)
         while True:
             try:
                 s = prompt_input(session, ctx)
-                commands.call_cmd(ctx, s, args.whitelist.split(','))
+                commands.call_cmd(s)
                 con.commit()
             except AssertionError:
                 print("Assertion not satisfied, cancelling command.")
 
-            commands.call_cmd(ctx, 'reset')
-            commands.call_cmd(ctx, args.view, args.whitelist.split(','))
+            commands.call_cmd('reset')
+            commands.call_cmd(args.view)
 else:
     while True:
         s = prompt_input(session, ctx)
         try:
-            commands.call_cmd(ctx, s, args.whitelist.split(','))
+            commands.call_cmd(s)
             con.commit()
         except AssertionError:
             print("Assertion not satisfied, cancelling command.")
