@@ -17,7 +17,8 @@ def stringify(task, fullpath=False, start_x=0):
     fullpath : bool
         Whether to print the full path or just the description.
     start_x : int
-        Number of characters before the string will be printed. Used for word wrapping"""
+        Number of characters before the string will be printed.
+        Used for word wrapping. -1 means no wrapping. """
     ctx = task.ctx
     desc = task.desc
     if fullpath:
@@ -49,9 +50,10 @@ def stringify(task, fullpath=False, start_x=0):
     term_size = shutil.get_terminal_size((80, 20))
     middle = 'x' if task.status else ' '
     prefix = '- ' if task.has_tag('group') else '- ['+middle+'] '
-    start_x += len(prefix)
-    desc = textwrap.wrap(desc, term_size[0] - start_x)
-    desc = ('\n' + ' '*start_x).join(desc)
+    if start_x > 0:
+        start_x += len(prefix)
+        desc = textwrap.wrap(desc, term_size[0] - start_x)
+        desc = ('\n' + ' '*start_x).join(desc)
 
     desc = desc.replace('&', 'amp;')
     desc = desc.replace('<', '&lt;')
@@ -127,5 +129,6 @@ def print_tree_line(task, tasks, depth, args = None):
     if prev_sep and not was_separated and not is_first:
         print(' '*justw + ' | ')
 
-    print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task, False, justw+3+4*depth)))
+    wrap = -1 if args['nowrap'] else justw + 3 + 4*depth 
+    print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task, False, wrap)))
     is_first = False

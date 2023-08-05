@@ -9,11 +9,12 @@ from util import *
 
 
 class CommandManager:
-    def __init__(self, ctx, allowed_commands):
+    def __init__(self, ctx, allowed_commands, nowrap):
         self.ctx = ctx
         self.parser = argparse.ArgumentParser(prog='scrytask')
         self.subparsers = self.parser.add_subparsers()
         self.whitelist = allowed_commands
+        self.nowrap = nowrap
         self.all_cmds = {'add',
                          'rename',
                          'done',
@@ -289,9 +290,9 @@ class CommandManager:
 
         if command == 'tree':
             if root is not None:
-                print_tree(filtered, sort_filters, filters, get_task(self.ctx, root), limit=limit)
+                print_tree(filtered, sort_filters, filters, get_task(self.ctx, root), limit=limit, nowrap=self.nowrap)
             else:
-                print_tree(filtered, sort_filters, filters, Task(self.ctx, {}), limit=limit)
+                print_tree(filtered, sort_filters, filters, Task(self.ctx, {}), limit=limit, nowrap=self.nowrap)
         else:
             filtered = [i for i in filtered if not i.is_filtered(filters)]
             sort_tasks(filtered, sort_filters)
@@ -308,7 +309,8 @@ class CommandManager:
                 filtered = filtered[:stop_idx]
             for i in filtered:
                 justw = max([len(str(i.uuid)) for i in filtered])
-                print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True, justw+3)))
+                wrap = -1 if self.nowrap else justw+3
+                print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True, wrap)))
         self.ctx.working_task = get_task(self.ctx, last_wrktsk)
 
     def cmd_list(self, args):

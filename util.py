@@ -89,7 +89,7 @@ def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
             args['limit'][0] -= 1
 
 
-def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=None):
+def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=None, nowrap=False):
     justw = max([len(str(i.uuid)) for i in tasks])
     global is_first
     is_first = True
@@ -97,7 +97,8 @@ def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=Non
                      {'limit_children': 5, 'sort_filters': sort_filters,
                       'hidden_function': lambda h, d: print(' '*justw + ' | ' + ' '*4*d + str(h) + " tasks hidden."),
                       'limit': [limit],
-                      'filters': filters})
+                      'filters': filters,
+                      'nowrap': nowrap})
 
 
 def assign_uuid(task):

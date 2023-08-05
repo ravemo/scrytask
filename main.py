@@ -36,7 +36,7 @@ parser.add_argument('--no-wrap', action='store_true', default=False)
 args = parser.parse_args()
 
 whitelist = None if args.whitelist is None else args.whitelist.split(',')
-commands = CommandManager(ctx, whitelist)
+commands = CommandManager(ctx, whitelist, args.no_wrap)
 
 for i in args.command:
     try:
