@@ -50,43 +50,39 @@ def get_new_uuid(cur, negative=False):
 
 
 
-def exec_recursively(task, tasks, depth, func, args={}, breadthfirst=True):
+def exec_recursively(task, tasks, depth, func, **kwargs):
     # TODO Clean this function
-    if args.get('limit', [None])[0] == 0:
+    limit = kwargs.get('limit', [None])
+    if limit[0] == 0:
         return
 
-    # Apply functions breadth-first if applicable
-    if breadthfirst and task.uuid is not None and depth >= 0: # cool hack
-        func(task, tasks, depth, args)
-        if args.get('limit', [None])[0] is not None:
-            args['limit'][0] -= 1
+    # Apply functions breadth-first
+    if task.uuid is not None and depth >= 0: # cool hack
+        func(task, tasks, depth, kwargs)
+        if limit[0] is not None:
+            limit[0] -= 1
 
-    filters = args.get('filters', [])
+    filters = kwargs.get('filters', [])
 
     children = task.get_children(filters)
-    if 'filters' in args:
-        children = [i for i in children if not i.is_filtered(args['filters'])]
+    if 'filters' in kwargs:
+        children = [i for i in children if not i.is_filtered(kwargs['filters'])]
     hidden = 0
-    sort_tasks(children, args.get('sort_filters', []))
+    sort_tasks(children, kwargs.get('sort_filters', []))
 
-    # Hide children
-    if depth >= 0 and args.get('limit_children', None) is not None and len(children) > 6:
-        hidden = len(children) - len(children[:args['limit_children']])
-        children = children[:args['limit_children']]
+    # Only show limit_children children per task if limit_children is set
+    limit_children = kwargs.get('limit_children', None)
+    if depth >= 0 and limit_children is not None and len(children) > limit_children+1:
+        hidden = len(children) - len(children[:limit_children])
+        children = children[:limit_children]
 
     # Recursive part
-    if depth == -1 or args.get('hidden_function', None) is None or not task.has_tag('collapse'):
+    if depth == -1 or kwargs.get('hidden_function', None) is None or not task.has_tag('collapse'):
         for i in children:
-            exec_recursively(i, tasks, depth+1, func, args)
+            exec_recursively(i, tasks, depth+1, func, **kwargs)
 
-    if hidden > 0 and args.get('hidden_function', None) is not None:
-        args['hidden_function'](hidden, depth+1)
-
-    # Apply functions depth-first if applicable
-    if not breadthfirst and task.uuid is not None and depth >= 0:
-        func(task, tasks, depth, args)
-        if args.get('limit', [None])[0] is not None:
-            args['limit'][0] -= 1
+    if hidden > 0 and kwargs.get('hidden_function', None) is not None:
+        kwargs['hidden_function'](hidden, depth+1)
 
 
 def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=None, nowrap=False):
@@ -94,11 +90,11 @@ def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=Non
     global is_first
     is_first = True
     exec_recursively(root_task, tasks, -1, print_tree_line,
-                     {'limit_children': 5, 'sort_filters': sort_filters,
-                      'hidden_function': lambda h, d: print(' '*justw + ' | ' + ' '*4*d + str(h) + " tasks hidden."),
-                      'limit': [limit],
-                      'filters': filters,
-                      'nowrap': nowrap})
+                     **{'limit_children': 5, 'sort_filters': sort_filters,
+                        'hidden_function': lambda h, d: print(' '*justw + ' | ' + ' '*4*d + str(h) + " tasks hidden."),
+                        'limit': [limit],
+                        'filters': filters,
+                        'nowrap': nowrap})
 
 
 def assign_uuid(task):
@@ -106,10 +102,10 @@ def assign_uuid(task):
     task.update_uuid(new_uuid)
 
 
-def remove(task, _tasks, _depth, args):
+def remove(cur, task):
     print('Removing task', task)
-    args['ctx'].cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', '  ')".format(task.uuid)) 
-    args['ctx'].cur.execute("DELETE FROM tasks WHERE uuid = {}".format(task.uuid))
+    cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', ' ')".format(task.uuid)) 
+    cur.execute("DELETE FROM tasks WHERE uuid = {}".format(task.uuid))
 
 
 def defrag(ctx):

@@ -1,11 +1,31 @@
 from prompt_toolkit.completion import NestedCompleter
 import parsedatetime as pdt
 import argparse
+import shlex
 import os
 
 from display import *
 from task import *
 from util import *
+
+def parse_id_list(cur, idlist):
+    src_uuids = []
+    for i in idlist:
+        if i.replace('-', '').isdigit():
+            src_uuids.append(int(i))
+        else: 
+            # It is possible some of the non-numbers are in the format x..y
+            limits = i.split('..')
+            if len(limits) == 2 and \
+               False not in [j.replace('-', '').isdigit() for j in limits]:
+                limits = [int(j) for j in limits]
+                src_uuids += [j for j in range(limits[0], limits[1]+1)]
+            else: # If it is not a number, consider them as a pattern matching.
+                # Do a few substitutions to change the unix-like pattern
+                # matching into SQLite pattern matching.
+                pattern = i.replace("'", "''")
+                src_uuids += [j['uuid'] for j in cur.execute(f"""SELECT uuid FROM tasks WHERE status IS NULL AND instr(desc, "{pattern}") != 0""").fetchall()]
+    return src_uuids
 
 
 class CommandManager:
@@ -46,6 +66,7 @@ class CommandManager:
         for i in ['rm']:
             subparser = self.subparsers.add_parser(i)
             subparser.add_argument('-r', action='store_true')
+            subparser.add_argument('-f', action='store_true')
             subparser.add_argument('id', type=str, nargs='+')
 
         for i in ['mv']:
@@ -69,18 +90,18 @@ class CommandManager:
 
         for i in ['depends']:
             subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('dependent', type=int)
+            subparser.add_argument('dependent', type=str)
             subparser.add_argument('--clear', action='store_true')
-            subparser.add_argument('dependency', type=int, nargs='*')
+            subparser.add_argument('dependency', type=str, nargs='*')
 
         for i in ['rename', 'start', 'due', 'repeat']:
             subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('uuid', type=int)
+            subparser.add_argument('id', type=str)
             subparser.add_argument('details', type=str, nargs='*')
 
         for i in ['tag']:
             subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('uuid', type=int)
+            subparser.add_argument('id', type=str)
             subparser.add_argument('-c', '--clear', action='store_true')
             subparser.add_argument('-x', '--exclude', type=str, nargs='+', default=[])
             subparser.add_argument('add', type=str, nargs='*')
@@ -193,17 +214,19 @@ class CommandManager:
 
     def cmd_rm(self, args):
         recursive = False
-        uuid = str_to_uuid(self.ctx, ' '.join(args.id))
-        task = get_task(self.ctx, uuid)
-        if args.r:
-            tasks = self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()
-            tasks = [Task(self.ctx, dict(i)) for i in tasks]
-            exec_recursively(task, tasks, 0, remove, {'ctx': self.ctx}, False)
-        else:
-            if len(self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
-                print("Can't remove task with children. Use -r for recursive removal.")
+        uuids = parse_id_list(self.ctx.cur, args.id)
+        for uuid in uuids:
+            task = get_task(self.ctx, uuid)
+            if args.r:
+                tasks = self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()
+                descendants = task.get_descendants()
+                for i in descendants:
+                    remove(self.ctx.cur, i)
             else:
-                remove(task, None, None, {'ctx': self.ctx})
+                if not args.f and len(self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
+                    print("Can't remove task with children. Use -r for recursive removal.")
+                else:
+                    remove(self.ctx.cur, task)
 
 
     def cmd_info(self, args):
@@ -211,32 +234,8 @@ class CommandManager:
 
 
     def cmd_mv(self, args):
-        src_uuids = []
-        if False not in [i.replace('-', '').isdigit() for i in args.src]:
-            # If all strings are numbers, use all of them as uuids
-            src_uuids = [int(i) for i in args.src]
-        else: 
-            # It is possible some of the non-numbers are in the format x..y
-            range_test = [i.split('..') for i in args.src]
-            flattened = [j for i in range_test for j in i]
-            print(f"{flattened=}")
-            if max([len(i) for i in range_test]) == 2 and \
-               False not in [j.replace('-', '').isdigit() for j in flattened]:
-                range_test = [[int(j) for j in i] for i in range_test]
-                src_uuids = [i[0] for i in range_test if len(i) == 1]
-                for i in range_test:
-                    if len(i) == 2:
-                        assert(i[1] > i[0])
-                        src_uuids += [j for j in range(i[0], i[1]+1)]
-            else: # If one of them is not a number, consider them as a pattern matching.
-                # Do a few substitutions to change the unix-like pattern matching into
-                # SQLite pattern matching.
-                pattern = ' '.join(args.src).replace("'", "''")
-                pattern = pattern.replace('%', '\\%').replace('_', '\\_')
-                pattern = pattern.replace('*', '%').replace('?', '_')
-                src_uuids = [i['uuid'] for i in self.ctx.cur.execute(f"""SELECT uuid FROM tasks WHERE desc LIKE "{pattern}" ESCAPE '\\'""").fetchall()]
-
-        src_uuids_str = '(' + ','.join([str(i) for i in src_uuids]) + ')'
+        src_uuids = parse_id_list(self.ctx.cur, args.src)
+        src_uuids_str = '(' + ','.join([str(i) for i in idlist]) + ')'
         self.ctx.cur.execute(f"UPDATE tasks SET parent={args.dst} WHERE uuid IN {src_uuids_str}")
         print("Moving tasks "+src_uuids_str+" to '"+get_task(self.ctx, args.dst).desc+"'")
 
@@ -322,23 +321,24 @@ class CommandManager:
 
     def cmd_depends(self, args):
         if args.clear:
-            task = get_task(self.ctx, args.dependent)
+            task = get_task(self.ctx, str_to_uuid(args.dependent))
             task.depends = []
             task.write_str('depends', None)
 
         for i in args.dependency:
-            get_task(self.ctx, args.dependent).add_dependency(i)
+            get_task(self.ctx, str_to_uuid(args.dependent)).add_dependency(i)
 
 
     def cmd_tag(self, args):
+        uuid = str_to_uuid(args.id)
         if args.clear:
-            self.ctx.cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(args.uuid)) 
+            self.ctx.cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(uuid)) 
             return
         to_add = [i.replace('#', '').strip() for i in args.add]
         to_remove = [i.replace('#', '').strip() for i in args.exclude]
         to_add = [i for i in to_add if i != '']
         to_remove = [i for i in to_remove if i != '']
-        task = get_task(self.ctx, args.uuid)
+        task = get_task(self.ctx, uuid)
         task.add_tags(to_add)
         task.remove_tags(to_remove)
         print("New tags:", "'"+task.get_tags_str()+"'")
@@ -414,8 +414,8 @@ class CommandManager:
 
 
     def reload_autocomplete(self):
-        data = self.ctx.cur.execute("SELECT c.desc FROM tasks c LEFT JOIN tasks p ON p.uuid = c.parent "+\
-                                    "WHERE c.status IS NULL AND (c.parent IS NULL OR p.tags NOT LIKE '% collapse %')").fetchall()
+        data = self.ctx.cur.execute("SELECT c.desc FROM tasks c LEFT JOIN tasks p ON p.uuid = c.parent "+
+                                    "WHERE c.status IS NULL AND (c.parent IS NULL OR instr(p.tags, ' collapse ') == 0)").fetchall()
 
         task_descs = {i['desc']: None for i in data}
         with_auto = {'add', 'done', 'undone', 'rm', 'info', 'tree', 'list',
@@ -431,7 +431,7 @@ class CommandManager:
             return
 
         aliases = {'dep': 'depends', 'scr': 'scry', 'exit': 'quit', 'q': 'quit'}
-        argv = full_command.split(' ')
+        argv = shlex.split(full_command)
         argv[0] = aliases.get(argv[0], argv[0])
         cmd = argv[0]
         if self.whitelist is not None and cmd not in self.whitelist:
