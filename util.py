@@ -186,7 +186,7 @@ def parse_new_task(ctx, args):
     tags = ' '.join([i.strip() for i in tags])
     
     # Adding './' before is a nice hack to add to working task by default
-    *parent, newdesc = split_esc('./'+desc, '/')
+    *parent, desc = split_esc('./'+desc, '/')
     parent = '/'.join(parent)
     parent_uuid = str_to_uuid(ctx, parent)
 
