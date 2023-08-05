@@ -70,7 +70,8 @@ class CommandManager:
         for i in ['depends']:
             subparser = self.subparsers.add_parser(i)
             subparser.add_argument('dependent', type=int)
-            subparser.add_argument('dependency', type=int, nargs='+')
+            subparser.add_argument('--clear', action='store_true')
+            subparser.add_argument('dependency', type=int, nargs='*')
 
         for i in ['rename', 'start', 'due', 'repeat']:
             subparser = self.subparsers.add_parser(i)
@@ -320,10 +321,13 @@ class CommandManager:
 
 
     def cmd_depends(self, args):
-        get_task(self.ctx, args.dependent).add_dependency(args.dependency[0])
+        if args.clear:
+            task = get_task(self.ctx, args.dependent)
+            task.depends = []
+            task.write_str('depends', None)
 
-        for i in range(1, len(args.dependency)):
-            get_task(self.ctx, args.dependency[i-1]).add_dependency(args.dependency[i])
+        for i in args.dependency:
+            get_task(self.ctx, args.dependent).add_dependency(i)
 
 
     def cmd_tag(self, args):
