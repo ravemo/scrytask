@@ -38,7 +38,7 @@ args = parser.parse_args()
 
 for i in args.command:
     try:
-        commands.call_cmd(ctx, i, args.whitelist)
+        commands.call_cmd(ctx, i, args.whitelist.split(','))
         con.commit()
     except AssertionError:
         print("Assertion not satisfied, cancelling command.")
@@ -61,18 +61,18 @@ if args.view != '':
         while True:
             try:
                 s = prompt_input(session, ctx)
-                commands.call_cmd(ctx, s, args.whitelist)
+                commands.call_cmd(ctx, s, args.whitelist.split(','))
                 con.commit()
             except AssertionError:
                 print("Assertion not satisfied, cancelling command.")
 
             commands.call_cmd(ctx, 'reset')
-            commands.call_cmd(ctx, args.view, args.whitelist)
+            commands.call_cmd(ctx, args.view, args.whitelist.split(','))
 else:
     while True:
         s = prompt_input(session, ctx)
         try:
-            commands.call_cmd(ctx, s, args.whitelist)
+            commands.call_cmd(ctx, s, args.whitelist.split(','))
             con.commit()
         except AssertionError:
             print("Assertion not satisfied, cancelling command.")
