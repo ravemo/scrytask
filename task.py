@@ -164,15 +164,15 @@ class Task:
         return True in [i.has_finished_after(curtime, True) for i in children]
 
 
-    def get_earliest_due(self, limit=datetime.now(), filters=[]):
+    def get_earliest_due(self, due_limit=None, start_limit=datetime.now(), filters=[]):
         """Return the earliest due date of all descendants that have all already started and are not blocked by filters.
-        Any due date after limit is ignored.
+        Any due date after due_limit or task not started before start_limit is ignored.
         Returns None if there are no due tasks satisfying our criteria."""
-        descendants = self.get_descendants(filters + [lambda x: x.has_started()])
+        descendants = self.get_descendants(filters + [lambda x: x.has_started(start_limit)])
         descendants.append(self) # We care about our own due date too
         dues = []
         for i in descendants:
-            if i.is_due(limit):
+            if due_limit is None or i.is_due(due_limit):
                 dues.append(i.due)
 
         dues = [i for i in dues if i is not None]

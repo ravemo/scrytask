@@ -139,8 +139,9 @@ class CommandManager:
 
 
     def cmd_rename(self, args):
-        new_task = parse_new_task(self.ctx, ' '.join(args.details))
-        get_task(self.ctx, args.uuid).write_str('desc', new_task['desc'])
+        new_desc = parse_new_task(self.ctx, ' '.join(args.details))['desc']
+        task = get_task(self.ctx, str_to_uuid(self.ctx, args.id))
+        task.write_str('desc', new_desc)
 
 
     def cmd_done(self, args):
@@ -242,6 +243,7 @@ class CommandManager:
 
     def _list_tree_common(self, args, command):
         cal = pdt.Calendar()
+        start_limit = cal.parseDT('in 24 hours', datetime.now())[0]
 
         sort_filters = []
         if args.done_after is None:
@@ -249,7 +251,7 @@ class CommandManager:
         else:
             sort_filters.append(lambda i: not i.has_finished_after(dateutil.parser.parse(args.done_after), command=='tree'))
 
-        sort_filters.append(lambda i: not i.has_started(cal.parseDT('in 24 hours', datetime.now())[0]))
+        sort_filters.append(lambda i: not i.has_started(start_limit))
 
         sort_filters.append(lambda i: (True in [i.has_tag(j) for j in args.exclude_tags]))
         if args.include_tags is not None:
@@ -300,11 +302,12 @@ class CommandManager:
                 remaining = limit
                 stop_idx = limit
                 for k, i in enumerate(filtered):
-                    if i.get_earliest_due() is not None or not i.has_started(datetime.now()):
+                    if i.get_earliest_due(start_limit=start_limit) is not None or not i.has_started(start_limit):
                         continue
                     remaining -= 1
                     if remaining == 0:
                         stop_idx = k+1
+                        break
 
                 filtered = filtered[:stop_idx]
             for i in filtered:
