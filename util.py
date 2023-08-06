@@ -149,7 +149,7 @@ def unscape(text, strings):
 
 def parse_new_task(ctx, args):
     """ Creates a dictionary from arguments, according to the following format:
-    {desc} [<- {dep}] [#{tag_1}] ... [#{tag_n}] [@ [{start}~] {due} [every {repeat}]]
+    {desc} [#{tag_1}] ... [#{tag_n}] [<- {dep}] [@ [{start}~] {due} [every {repeat}]]
     {} describes variables, [] is optional.
     """
     clean = lambda x: x[0].strip() if x != [] else None

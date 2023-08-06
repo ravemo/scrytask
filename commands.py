@@ -53,77 +53,93 @@ class CommandManager:
                          'depends',
                          'dep',
                          'tag',
-                         'scry',
+                         'requeue',
                          'bump',
                          'defrag',
                          'reset',
                          'cd',
-                         'grep',
+                         'search',
                          'quit',
                          }
 
         for i in ['add']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('details', type=str, nargs='+')
+            subparser = self.subparsers.add_parser(i, description="Add a new task to the list.")
+            subparser.add_argument('details', type=str, nargs='+', help="Syntax: \n"+
+            "{desc} [#{tag_1}] ... [#{tag_n}] [<- {dep}] [@ [{start}~] {due} [every {repeat}]]\n"+
+            "Where anything inside [] is optional")
 
         for i in ['rm']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('-r', action='store_true')
-            subparser.add_argument('-f', action='store_true')
-            subparser.add_argument('id', type=str, nargs='+')
+            subparser = self.subparsers.add_parser(i, description="Remove task from the list permanently")
+            subparser.add_argument('-r', action='store_true', help='Removes all subtasks recursively')
+            subparser.add_argument('id', type=str, nargs='+', help='List of tasks to be removed')
 
         for i in ['mv']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('src', type=str, nargs='+')
-            subparser.add_argument('dst', type=str)
+            subparser = self.subparsers.add_parser(i, description="Move tasks into another task as subtasks")
+            subparser.add_argument('src', type=str, nargs='+', help='List of tasks to be moved')
+            subparser.add_argument('dst', type=str, help='Task to be moved to')
 
+        description = {'list': "Show a list of tasks. Shows only 5 non-due pending tasks by default.",
+                       'tree': "Show a tree of tasks. Shows only 10 pending tasks by default."}
         for i in ['list', 'tree']:
             default_limit = 10 if i == 'tree' else 5
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('-a', '--all', action='store_true')
-            subparser.add_argument('--due', action='store_true')
-            subparser.add_argument('--blocked', action='store_true')
-            subparser.add_argument('--no-limit', action='store_true')
-            subparser.add_argument('-l', '--leaf', action='store_true')
-            subparser.add_argument('-x', '--exclude-tags', type=str, nargs='*', default=[])
-            subparser.add_argument('--include-tags', type=str, nargs='*')
-            subparser.add_argument('--done-after', type=str, action='store')
-            subparser.add_argument('-n', type=int, action='store', default=default_limit)
-            subparser.add_argument('id', type=str, nargs='*')
+            subparser = self.subparsers.add_parser(i, description=description[i])
+            subparser.add_argument('-a', '--all', action='store_true', help="Don't hide any task")
+            subparser.add_argument('--due', action='store_true', help="Show only tasks that have due dates")
+            subparser.add_argument('--blocked', action='store_true', help="Show only tasks that have a pending dependency")
+            subparser.add_argument('--no-limit', action='store_true', help="Don't limit number of tasks shown")
+            subparser.add_argument('-l', '--leaf', action='store_true', help="Show only tasks with no subtasks")
+            subparser.add_argument('-x', '--exclude-tags', type=str, nargs='*', default=[], help="Hide all tasks that contain any of the tags specified")
+            subparser.add_argument('--include-tags', type=str, nargs='*', help="Hide all tasks that does not contain any of the tags specified")
+            subparser.add_argument('--done-after', type=str, action='store', help="Show tasks that have finished after the date specified")
+            subparser.add_argument('-n', type=int, action='store', default=default_limit, help="Set number of tasks to be shown. Due tasks are not counted towards this limit.")
+            subparser.add_argument('id', type=str, nargs='*', help="Limits to subtasks of the task specified.")
 
         for i in ['depends']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('dependent', type=str)
-            subparser.add_argument('--clear', action='store_true')
-            subparser.add_argument('dependency', type=str, nargs='*')
+            subparser = self.subparsers.add_parser(i, description="Sets dependencies on tasks. Tasks with dependencies will be hidden until all its dependencies are completed.")
+            subparser.add_argument('dependent', type=str, help="Task which will depend on the second argument.")
+            subparser.add_argument('--clear', action='store_true', help="Remove all dependencies")
+            subparser.add_argument('dependency', type=str, nargs='*', help="All tasks that the first task depends on.")
 
         for i in ['rename', 'start', 'due', 'repeat']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('id', type=str)
-            subparser.add_argument('details', type=str, nargs='*')
+            description = {'rename': 'Rename task',
+                           'start': 'Set start date',
+                           'due': 'Set due date',
+                           'repeat': 'Set repeat interval'}
+            subparser = self.subparsers.add_parser(i, description=description[i])
+            subparser.add_argument('id', type=str, help="Task to be modified")
+            subparser.add_argument('details', type=str, nargs='*', help="Details of new parameters. Leave empty if you want to reset to default.")
 
         for i in ['tag']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('id', type=str)
-            subparser.add_argument('-c', '--clear', action='store_true')
-            subparser.add_argument('-x', '--exclude', type=str, nargs='+', default=[])
-            subparser.add_argument('add', type=str, nargs='*')
+            subparser = self.subparsers.add_parser(i, description="Set tags")
+            subparser.add_argument('id', type=str, help="Task to be modified")
+            subparser.add_argument('-c', '--clear', action='store_true', help="Remove all existing tags on the task")
+            subparser.add_argument('-x', '--exclude', type=str, nargs='+', default=[], help="Remove all tags specified")
+            subparser.add_argument('add', type=str, nargs='*', help="Add all tags specified")
 
         for i in ['info', 'done', 'undone', 'cd']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('id', type=str, nargs='*')
+            description = {'info': "Shows all information about the task (uuid, description, start date, due date, repeat interval, dependencies, tags)",
+                           'done': "Mark task as done",
+                           'undone': "Mark task as not done",
+                           'cd': "Navigate into a task"}
+            subparser = self.subparsers.add_parser(i, description=description[i])
+            subparser.add_argument('id', type=str, nargs='*', help="Target task")
 
-        for i in ['scry', 'bump']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('-l', '--local', action='store_true')
-            subparser.add_argument('id', type=str, nargs='*')
+        for i in ['requeue', 'bump']:
+            description = {'requeue': "Move task into bottom of the list",
+                           'bump': "Move task into top of the list"}
+            subparser = self.subparsers.add_parser(i, description=description[i])
+            subparser.add_argument('-l', '--local', action='store_true', help="DEPRECATED")
+            subparser.add_argument('id', type=str, nargs='*', help="Target task")
 
         for i in ['reset', 'defrag', 'quit']:
-            subparser = self.subparsers.add_parser(i)
+            description = {'reset': 'Clear screen',
+                           'defrag': 'Reorganizes UUIDs; gives smaller numbers to tasks closer to the top of the list',
+                           'quit': 'Quit the program'}
+            subparser = self.subparsers.add_parser(i, description=description[i])
 
-        for i in ['grep']:
-            subparser = self.subparsers.add_parser(i)
-            subparser.add_argument('search', type=str, nargs='*')
+        for i in ['search']:
+            subparser = self.subparsers.add_parser(i, description='List all tasks containing a substring')
+            subparser.add_argument('search', type=str, nargs='*', help='Substring to find')
 
 
     # ---------------------------------------------------------------------------
@@ -198,7 +214,7 @@ class CommandManager:
 
     def _start_due_repeat_common(self, args, command):
         cal = pdt.Calendar()
-        task = get_task(self.ctx, args.uuid)
+        task = get_task(self.ctx, str_to_uuid(self.ctx, args.id))
         details = ' '.join(args.details)
         if command == 'start' or command == 'due':
             new_val = None if details == '' else cal.parseDT(details, datetime.now())[0]
@@ -227,7 +243,7 @@ class CommandManager:
                 for i in descendants:
                     remove(self.ctx.cur, i)
             else:
-                if not args.f and len(self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
+                if len(self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
                     print("Can't remove task with children. Use -r for recursive removal.")
                 else:
                     remove(self.ctx.cur, task)
@@ -238,16 +254,22 @@ class CommandManager:
 
 
     def cmd_mv(self, args):
-        src_uuids = parse_id_list(self.ctx.cur, args.src)
-        src_uuids_str = '(' + ','.join([str(i) for i in src_uuids]) + ')'
         dst = str_to_uuid(self.ctx, args.dst)
+        src_uuids = parse_id_list(self.ctx.cur, args.src)
+        if dst in src_uuids:
+            print("WARNING: Trying to move "+args.dst+" into itself. Removing it from src.")
+            src_uuids.remove(dst)
+            if len(src_uuids) == 0:
+                print("WARNING: No tasks left to move. Ending operation.")
+                return
+        src_uuids_str = '(' + ','.join([str(i) for i in src_uuids]) + ')'
         self.ctx.cur.execute(f"UPDATE tasks SET parent={dst} WHERE uuid IN {src_uuids_str}")
         print("Moving tasks "+src_uuids_str+" to '"+get_task(self.ctx, dst).desc+"'")
 
 
     def _list_tree_common(self, args, command):
         cal = pdt.Calendar()
-        start_limit = cal.parseDT('in 24 hours', datetime.now())[0]
+        start_limit = cal.parseDT('in 12 hours', datetime.now())[0]
 
         sort_filters = []
         if args.done_after is None:
@@ -327,13 +349,13 @@ class CommandManager:
 
 
     def cmd_depends(self, args):
+        task = get_task(self.ctx, str_to_uuid(args.dependent))
         if args.clear:
-            task = get_task(self.ctx, str_to_uuid(args.dependent))
             task.depends = []
             task.write_str('depends', None)
 
         for i in args.dependency:
-            get_task(self.ctx, str_to_uuid(args.dependent)).add_dependency(i)
+            task.add_dependency(i)
 
 
     def cmd_tag(self, args):
@@ -351,7 +373,7 @@ class CommandManager:
         print("New tags:", "'"+task.get_tags_str()+"'")
 
 
-    def _scry_bump_common(self, args, which):
+    def _requeue_bump_common(self, args, which):
         uuid = str_to_uuid(self.ctx, ' '.join(args.id))
         task = get_task(self.ctx, uuid)
         cond = ['status IS NULL', 'gauge IS NOT NULL', f'uuid != {uuid}']
@@ -363,10 +385,10 @@ class CommandManager:
 
         cond = ' AND '.join(cond)
         gauges = [i[0] for i in self.ctx.cur.execute('SELECT gauge FROM tasks WHERE ' + cond)]
-        add = 1 if which == 'scry' else -1
+        add = 1 if which == 'requeue' else -1
         ref = 0
         if len(gauges) > 0:
-            ref = max(gauges) if which == 'scry' else min(gauges)
+            ref = max(gauges) if which == 'requeue' else min(gauges)
         task.update_gauge(ref + add)
 
         if args.local:
@@ -377,11 +399,11 @@ class CommandManager:
             self.ctx.cur.execute(f'UPDATE tasks SET gauge = gauge - {min(gauges)} + 1 WHERE ' + cond)
 
 
-    def cmd_scry(self, args):
-        self._scry_bump_common(args, 'scry')
+    def cmd_requeue(self, args):
+        self._requeue_bump_common(args, 'requeue')
 
     def cmd_bump(self, args):
-        self._scry_bump_common(args, 'bump')
+        self._requeue_bump_common(args, 'bump')
 
 
     def cmd_cd(self, args):
@@ -396,7 +418,7 @@ class CommandManager:
             self.ctx.working_task = get_task(self.ctx, str_to_uuid(self.ctx, joined))
 
 
-    def cmd_grep(self, args):
+    def cmd_search(self, args):
         search = ' '.join(args.search)
         matches = self.ctx.cur.execute("SELECT * FROM tasks WHERE desc LIKE '%{}%' AND status IS NULL".format(search)).fetchall()
         matches = [Task(self.ctx, dict(i)) for i in matches]
@@ -426,7 +448,7 @@ class CommandManager:
 
         task_descs = {i['desc']: None for i in data}
         with_auto = {'add', 'done', 'undone', 'rm', 'info', 'tree', 'list',
-                     'scry', 'bump', 'cd'}
+                     'requeue', 'bump', 'cd'}
         self.completer = NestedCompleter.from_nested_dict(\
             {i: task_descs for i in with_auto} | \
             {i: None for i in self.all_cmds - with_auto})
@@ -437,10 +459,19 @@ class CommandManager:
         if full_command == '':
             return
 
-        aliases = {'dep': 'depends', 'scr': 'scry', 'exit': 'quit', 'q': 'quit'}
-        argv = shlex.split(full_command)
+        aliases = {'dep': 'depends', 'req': 'requeue', 'q': 'quit'}
+        argv = full_command.split(' ')
         argv[0] = aliases.get(argv[0], argv[0])
         cmd = argv[0]
+        # The arguments in this condition takes only a single task as an argument,
+        # so shlex parsing will be a problem if we type things like "can't"
+        if cmd in {'add', 'info', 'done', 'cd', 'requeue', 'bump'}:
+            argv[1:] = full_command.split(' ')[1:]
+        else:
+            # Since shlex will translate \/ into /, we have to escape the \ 
+            # because it will be useful for us later to know when it was escaped
+            full_command = full_command.replace(r'\/', r'\\/')
+            argv[1:] = shlex.split(full_command)[1:]
         if self.whitelist is not None and cmd not in self.whitelist:
             print("Command now allowed:", cmd)
             assert(0)

@@ -26,13 +26,13 @@ def prompt_input(session, ctx):
 
 def_location = platformdirs.user_data_dir('scrytask', ensure_exists=True)+'/tasks.db'
 
-parser = argparse.ArgumentParser(prog='scrytask')
-parser.add_argument('-i', '--interactive', action='store_true')
-parser.add_argument('-v', '--view', type=str, nargs='?', default='')
-parser.add_argument('-c', '--command', type=str, nargs='+', default=[])
-parser.add_argument('-w', '--whitelist', type=str, default=None)
-parser.add_argument('--database', type=str, default=def_location)
-parser.add_argument('--no-wrap', action='store_true', default=False)
+parser = argparse.ArgumentParser(prog='scrytask', description='A minimal terminal-based task manager')
+parser.add_argument('-i', '--interactive', action='store_true', help="Runs a interactive shell")
+parser.add_argument('-v', '--view', type=str, nargs='?', default='', help="Runs a command whenever the database updates")
+parser.add_argument('-c', '--command', type=str, nargs='+', default=[], help="Run the commands specified after")
+parser.add_argument('-w', '--whitelist', type=str, default=None, help="Limit commands allowed to be used")
+parser.add_argument('--database', type=str, default=def_location, help="Path to the database")
+parser.add_argument('--no-wrap', action='store_true', default=False, help="Do not wrap text")
 args = parser.parse_args()
 print("Using database at:", args.database)
 #if not os.path.exists(args.database):
