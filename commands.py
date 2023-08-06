@@ -85,6 +85,7 @@ class CommandManager:
             subparser = self.subparsers.add_parser(i, description=description[i])
             subparser.add_argument('-a', '--all', action='store_true', help="Don't hide any task")
             subparser.add_argument('--due', action='store_true', help="Show only tasks that have due dates")
+            subparser.add_argument('--no-due', action='store_true', help="Show only tasks that have no due dates")
             subparser.add_argument('--blocked', action='store_true', help="Show only tasks that have a pending dependency")
             subparser.add_argument('--no-limit', action='store_true', help="Don't limit number of tasks shown")
             subparser.add_argument('-l', '--leaf', action='store_true', help="Show only tasks with no subtasks")
@@ -147,6 +148,12 @@ class CommandManager:
     # ---------------------------------------------------------------------------
     def cmd_add(self, args):
         task = Task(self.ctx, parse_new_task(self.ctx, ' '.join(args.details)))
+        family = self.ctx.get_descendants()
+        cond = ['status IS NULL', 'gauge IS NOT NULL']
+        cond.append('uuid in (' + ','.join([str(i.uuid) for i in family]) + ')')
+        cond = ' AND '.join(cond)
+        gauges = [i[0] for i in self.ctx.cur.execute('SELECT gauge FROM tasks WHERE ' + cond)]
+        gauge = min(gauges)-1 if len(gauges) > 0 else None
         print(task)
         self.ctx.cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task.uuid, task.parent, task.desc))
         task.write_str('start', task.start)
@@ -155,6 +162,7 @@ class CommandManager:
         task.write_str('tags', task.get_tags_str())
         task.write_str('depends', task.get_depends_str())
         task.write_str('created', str(datetime.now()))
+        task.write_str('gauge', gauge)
 
 
     def cmd_rename(self, args):
@@ -299,6 +307,8 @@ class CommandManager:
             filters = []
         elif args.due:
             filters = sort_filters + [lambda i: i.get_earliest_due() is None]
+        elif args.no_due:
+            filters = sort_filters + [lambda i: i.get_earliest_due() is not None]
         else:
             filters = sort_filters
 
@@ -325,17 +335,7 @@ class CommandManager:
             filtered = [i for i in filtered if not i.is_filtered(filters)]
             sort_tasks(filtered, sort_filters)
             if limit is not None:
-                remaining = limit
-                stop_idx = limit
-                for k, i in enumerate(filtered):
-                    if i.get_earliest_due(start_limit=start_limit) is not None or not i.has_started(start_limit):
-                        continue
-                    remaining -= 1
-                    if remaining == 0:
-                        stop_idx = k+1
-                        break
-
-                filtered = filtered[:stop_idx]
+                filtered = filtered[:limit]
             for i in filtered:
                 justw = max([len(str(i.uuid)) for i in filtered])
                 wrap = -1 if self.nowrap else justw+3
@@ -376,12 +376,9 @@ class CommandManager:
     def _requeue_bump_common(self, args, which):
         uuid = str_to_uuid(self.ctx, ' '.join(args.id))
         task = get_task(self.ctx, uuid)
+        family = self.ctx.get_descendants()
         cond = ['status IS NULL', 'gauge IS NOT NULL', f'uuid != {uuid}']
-        if args.local:
-            if task.parent is None:
-                cond.append('parent IS NULL')
-            else:
-                cond.append(f'parent = {task.parent}')
+        cond.append('uuid in (' + ','.join([str(i.uuid) for i in family]) + ')')
 
         cond = ' AND '.join(cond)
         gauges = [i[0] for i in self.ctx.cur.execute('SELECT gauge FROM tasks WHERE ' + cond)]
@@ -391,12 +388,8 @@ class CommandManager:
             ref = max(gauges) if which == 'requeue' else min(gauges)
         task.update_gauge(ref + add)
 
-        if args.local:
-            # Keep minimum and maximum gauge of its siblings constant
-            self.ctx.cur.execute(f'UPDATE tasks SET gauge = gauge - {add} WHERE ' + cond)
-        elif len(gauges) > 0:
-            # Make the minimum gauge be 1 so that every new task is added to the top
-            self.ctx.cur.execute(f'UPDATE tasks SET gauge = gauge - {min(gauges)} + 1 WHERE ' + cond)
+        # Keep minimum and maximum gauge of its siblings constant
+        self.ctx.cur.execute(f'UPDATE tasks SET gauge = gauge - {add} WHERE ' + cond)
 
 
     def cmd_requeue(self, args):
