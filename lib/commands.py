@@ -4,9 +4,9 @@ import argparse
 import shlex
 import os
 
-from display import *
-from task import *
-from util import *
+from lib.display import *
+from lib.task import *
+from lib.util import *
 
 def parse_id_list(cur, idlist):
     src_uuids = []

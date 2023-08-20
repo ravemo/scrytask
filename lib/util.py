@@ -5,8 +5,8 @@ import parsedatetime as pdt
 import sqlite3
 import re
 
-from display import *
-from task import *
+from lib.display import *
+from lib.task import *
 
 max_child_shown = 5
 
