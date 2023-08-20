@@ -250,6 +250,7 @@ class CommandManager:
                 descendants = task.get_descendants()
                 for i in descendants:
                     remove(self.ctx.cur, i)
+                remove(self.ctx.cur, task)
             else:
                 if len(self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()) > 0:
                     print("Can't remove task with children. Use -r for recursive removal.")
