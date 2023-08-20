@@ -230,7 +230,7 @@ class CommandManager:
             task.write_str(command, new_val)
         else:
             new_repeat = None if details == '' else details
-            task.write_str('repeat', args.details)
+            task.write_str('repeat', new_repeat)
 
     def cmd_start(self, args):
         self._start_due_repeat_common(args, 'start')
@@ -277,7 +277,7 @@ class CommandManager:
 
     def _list_tree_common(self, args, command):
         cal = pdt.Calendar()
-        start_limit = cal.parseDT('in 12 hours', datetime.now())[0]
+        start_limit = datetime.now() # TODO: Add argument to change this
 
         sort_filters = []
         if args.done_after is None:
@@ -324,7 +324,7 @@ class CommandManager:
 
         data = list(self.ctx.cur.execute('select * from tasks').fetchall())
         tasks = [Task(self.ctx, dict(i)) for i in data]
-        filtered = [i for i in tasks if i.is_descendant(root)]
+        filtered = [i for i in tasks if i.is_descendant(root) and i.uuid != root]
 
         if command == 'tree':
             if root is not None:
@@ -349,7 +349,7 @@ class CommandManager:
 
 
     def cmd_depends(self, args):
-        task = get_task(self.ctx, str_to_uuid(args.dependent))
+        task = get_task(self.ctx, str_to_uuid(self.ctx, args.dependent))
         if args.clear:
             task.depends = []
             task.write_str('depends', None)
@@ -359,7 +359,7 @@ class CommandManager:
 
 
     def cmd_tag(self, args):
-        uuid = str_to_uuid(args.id)
+        uuid = str_to_uuid(self.ctx, args.id)
         if args.clear:
             self.ctx.cur.execute("UPDATE tasks SET tags = NULL WHERE uuid = {}".format(uuid)) 
             return
@@ -420,6 +420,11 @@ class CommandManager:
         for i in matches:
             justw = max([len(str(i.uuid)) for i in matches])
             print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True)))
+
+
+    def cmd_help(self, args):
+        defrag(self.ctx)
+        os.system('clear')
 
 
     def cmd_defrag(self, _args):
