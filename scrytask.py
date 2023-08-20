@@ -35,9 +35,6 @@ parser.add_argument('--database', type=str, default=def_location, help="Path to 
 parser.add_argument('--no-wrap', action='store_true', default=False, help="Do not wrap text")
 args = parser.parse_args()
 print("Using database at:", args.database)
-#if not os.path.exists(args.database):
-#    print("Error: File " + args.database + " not found.")
-#    exit(1)
 con = sqlite3.connect(args.database)
 con.row_factory = sqlite3.Row
 cur = con.cursor()
@@ -77,7 +74,7 @@ if args.view != '':
 
     if not args.interactive:
         wm = pyinotify.WatchManager()
-        wm.add_watch('tasks.db', pyinotify.IN_MODIFY)
+        wm.add_watch(def_location, pyinotify.IN_MODIFY)
         notifier = pyinotify.Notifier(wm, timeout=15*60*1000)
         notifier.loop(callback=lambda n: (commands.call_cmd('reset'),
                                           commands.call_cmd(args.view)))
