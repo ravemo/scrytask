@@ -8,8 +8,7 @@ It is also possible to limit the view into a subset of tasks, so you can view di
 
 # Getting started
 
-1. Install taskscry with `pip install scrytask`
-2. Run scrytask with `scrytask`
+2. Clone this repo and run `python scrytask.py`
 3. Add tasks with `add (task description)`.
 4. Show tasks in list mode with `list` or in tree mode with `tree`.
 5. Complete a task with `done (task)`. Remove with `rm (task)`.
