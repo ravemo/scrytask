@@ -99,3 +99,6 @@ else:
             con.commit()
         except AssertionError:
             print("Assertion not satisfied, cancelling command.")
+        except SystemExit:
+            if len(s.split(' ')) == 1:
+                quit()

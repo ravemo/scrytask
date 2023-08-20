@@ -422,11 +422,6 @@ class CommandManager:
             print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True)))
 
 
-    def cmd_help(self, args):
-        defrag(self.ctx)
-        os.system('clear')
-
-
     def cmd_defrag(self, _args):
         defrag(self.ctx)
         os.system('clear')
