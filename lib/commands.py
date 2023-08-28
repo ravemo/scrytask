@@ -272,8 +272,12 @@ class CommandManager:
                 print("WARNING: No tasks left to move. Ending operation.")
                 return
         src_uuids_str = '(' + ','.join([str(i) for i in src_uuids]) + ')'
-        self.ctx.cur.execute(f"UPDATE tasks SET parent={dst} WHERE uuid IN {src_uuids_str}")
-        print("Moving tasks "+src_uuids_str+" to '"+get_task(self.ctx, dst).desc+"'")
+        if dst is None:
+            self.ctx.cur.execute(f"UPDATE tasks SET parent = NULL WHERE uuid IN {src_uuids_str}")
+            print("Moving tasks "+src_uuids_str+" to /'")
+        else:
+            self.ctx.cur.execute(f"UPDATE tasks SET parent={dst} WHERE uuid IN {src_uuids_str}")
+            print("Moving tasks "+src_uuids_str+" to '"+get_task(self.ctx, dst).desc+"'")
 
 
     def _list_tree_common(self, args, command):

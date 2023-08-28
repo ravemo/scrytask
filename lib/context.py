@@ -1,5 +1,5 @@
 import sqlite3
-import lib.task
+import lib.task as task
 
 class Context:
     def __init__(self, cur):

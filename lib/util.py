@@ -26,10 +26,9 @@ def sort_tasks(data, filters):
                              ),
               reverse=True)
     cal = pdt.Calendar()
-    limit = cal.parseDT('in 2 days', datetime.now())[0]
     data.sort(key=lambda x: (x.status is not None,
-                             (x.get_earliest_due(limit, filters=filters) is None),
-                             (x.get_earliest_due(limit, filters=filters)),
+                             (x.get_earliest_due(filters=filters) is None),
+                             (x.get_earliest_due(filters=filters)),
                              is_empty_group(x, filters),
                              x.gauge,
                             ))
