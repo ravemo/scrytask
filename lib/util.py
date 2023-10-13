@@ -222,7 +222,7 @@ def str_to_uuid(ctx, s, pending_only=True):
             cur_uuid = get_task(ctx, cur_uuid).parent
         elif i == '/':
             cur_uuid = None
-        elif i[0] == '-' and i[1:].isdigit():
+        elif i.isdigit() or i[0] == '-' and i[1:].isdigit():
             cur_uuid = int(i)
             _ = get_task(ctx, cur_uuid) # check if exists
         else:
