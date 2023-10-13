@@ -8,7 +8,7 @@ from prompt_toolkit import print_formatted_text as print
 from prompt_toolkit import HTML
 
 
-def stringify(task, fullpath=False, start_x=0):
+def stringify(task, fullpath=False, start_x=0, show_boxes=True):
     """Returns markdown-like string giving all the important information about
     the task.
 
@@ -49,7 +49,9 @@ def stringify(task, fullpath=False, start_x=0):
 
     term_size = shutil.get_terminal_size((80, 20))
     middle = 'x' if task.status else ' '
-    prefix = '- ' if task.has_tag('_group') else '- ['+middle+'] '
+    prefix = ''
+    if show_boxes:
+        prefix = '- ' if task.has_tag('_group') else '- ['+middle+'] '
     if start_x > 0:
         start_x += len(prefix)
         desc = textwrap.wrap(desc, term_size[0] - start_x)
@@ -111,24 +113,31 @@ def get_rel_time_text(date):
 
 was_separated = False
 is_first = True
-def print_tree_line(task, tasks, depth, args = None):
+def print_tree_line(task, tasks, depth, args):
     """Print a single line of a task tree."""
     justw = max([len(str(i.uuid)) for i in tasks])
     filters = args.get('filters', [])
 
     global was_separated, is_first
     prev_sep = was_separated
+    empty_prefix = ''
+    if not args['no_uuid']:
+        empty_prefix = ' '*justw + ' | '
     if depth == 0:
         if task.has_tag('_group') or len(task.get_descendants()) >= 2:
             if not is_first:
-                print(' '*justw + ' | ')
+                print(empty_prefix)
             was_separated = True
         else:
             was_separated = False
 
     if prev_sep and not was_separated and not is_first:
-        print(' '*justw + ' | ')
+        print(empty_prefix)
 
-    wrap = -1 if args['nowrap'] else justw + 3 + 4*depth 
-    print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task, False, wrap)))
+    if args['no_uuid']:
+        wrap = -1 if args['nowrap'] else 4*depth 
+        print(HTML(' '*4*depth + stringify(task, False, wrap, not args['no_boxes'])))
+    else:
+        wrap = -1 if args['nowrap'] else justw + 3 + 4*depth 
+        print(HTML(str(task.uuid).rjust(justw) + ' | ' + ' '*4*depth + stringify(task, False, wrap, not args['no_boxes'])))
     is_first = False

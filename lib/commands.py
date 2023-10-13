@@ -88,6 +88,8 @@ class CommandManager:
             subparser.add_argument('--no-due', action='store_true', help="Show only tasks that have no due dates")
             subparser.add_argument('--blocked', action='store_true', help="Show only tasks that have a pending dependency")
             subparser.add_argument('--no-limit', action='store_true', help="Don't limit number of tasks shown")
+            subparser.add_argument('--no-uuid', action='store_true', help="Don't show uuid of tasks")
+            subparser.add_argument('--no-boxes', action='store_true', help="Don't show completed/not completed boxes")
             subparser.add_argument('-l', '--leaf', action='store_true', help="Show only tasks with no subtasks")
             subparser.add_argument('-x', '--exclude-tags', type=str, nargs='*', default=[], help="Hide all tasks that contain any of the tags specified")
             subparser.add_argument('--include-tags', type=str, nargs='*', help="Hide all tasks that does not contain any of the tags specified")
@@ -98,8 +100,9 @@ class CommandManager:
         for i in ['depends']:
             subparser = self.subparsers.add_parser(i, description="Sets dependencies on tasks. Tasks with dependencies will be hidden until all its dependencies are completed.")
             subparser.add_argument('dependent', type=str, help="Task which will depend on the second argument.")
-            subparser.add_argument('--clear', action='store_true', help="Remove all dependencies")
             subparser.add_argument('dependency', type=str, nargs='*', help="All tasks that the first task depends on.")
+            subparser.add_argument('--clear', action='store_true', help="Remove all dependencies")
+            subparser.add_argument('--chain', action='store_true', help="Make the tasks on each argument depend on the task of the next argument.")
 
         for i in ['rename', 'start', 'due', 'repeat']:
             description = {'rename': 'Rename task',
@@ -259,7 +262,10 @@ class CommandManager:
 
 
     def cmd_info(self, args):
-        print(get_task(self.ctx, str_to_uuid(self.ctx, ' '.join(args.id))))
+        task = get_task(self.ctx, str_to_uuid(self.ctx, ' '.join(args.id)))
+        print(task)
+        if task.parent is not None:
+            print("parent:", task.parent)
 
 
     def cmd_mv(self, args):
@@ -308,6 +314,7 @@ class CommandManager:
 
         if command != 'tree':
             sort_filters += [lambda i: i.has_tag('_group')]
+
         if args.all:
             filters = []
         elif args.due:
@@ -316,6 +323,7 @@ class CommandManager:
             filters = sort_filters + [lambda i: i.get_earliest_due() is not None]
         else:
             filters = sort_filters
+        
 
         limit = None if args.no_limit else args.n
         if args.id == []:
@@ -333,18 +341,22 @@ class CommandManager:
 
         if command == 'tree':
             if root is not None:
-                print_tree(filtered, sort_filters, filters, get_task(self.ctx, root), limit=limit, nowrap=self.nowrap)
+                print_tree(filtered, sort_filters, filters, args, get_task(self.ctx, root), limit=limit, nowrap=self.nowrap)
             else:
-                print_tree(filtered, sort_filters, filters, Task(self.ctx, {}), limit=limit, nowrap=self.nowrap)
+                print_tree(filtered, sort_filters, filters, args, Task(self.ctx, {}), limit=limit, nowrap=self.nowrap)
         else:
             filtered = [i for i in filtered if not i.is_filtered(filters)]
             sort_tasks(filtered, sort_filters)
             if limit is not None:
                 filtered = filtered[:limit]
             for i in filtered:
-                justw = max([len(str(i.uuid)) for i in filtered])
-                wrap = -1 if self.nowrap else justw+3
-                print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True, wrap)))
+                if args.no_uuid:
+                    wrap = -1 if self.nowrap else 0
+                    print(HTML(stringify(i, True, wrap, not args.no_boxes)))
+                else:
+                    justw = max([len(str(i.uuid)) for i in filtered])
+                    wrap = -1 if self.nowrap else justw+3
+                    print(HTML(str(i.uuid).rjust(justw) + ' | ' + stringify(i, True, wrap, not args.no_boxes)))
         self.ctx.working_task = get_task(self.ctx, last_wrktsk)
 
     def cmd_list(self, args):
@@ -354,13 +366,23 @@ class CommandManager:
 
 
     def cmd_depends(self, args):
+        for i in args.dependency:
+            if not i.isdigit():
+                print("Error: '"+i+"' is not an uuid.")
+                assert 0
         task = get_task(self.ctx, str_to_uuid(self.ctx, args.dependent))
         if args.clear:
             task.depends = []
             task.write_str('depends', None)
 
-        for i in args.dependency:
-            task.add_dependency(i)
+        if args.chain:
+            chain = [args.dependent] + args.dependency
+            for i in range(len(chain)-1):
+                taski = get_task(self.ctx, str_to_uuid(self.ctx, chain[i]))
+                taski.add_dependency(chain[i+1])
+        else:
+            for i in args.dependency:
+                task.add_dependency(i)
 
 
     def cmd_tag(self, args):

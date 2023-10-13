@@ -84,7 +84,7 @@ def exec_recursively(task, tasks, depth, func, **kwargs):
         kwargs['hidden_function'](hidden, depth+1)
 
 
-def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=None, nowrap=False):
+def print_tree(tasks, sort_filters, filters, args, root_task={'uuid': None}, limit=None, nowrap=False):
     justw = max([len(str(i.uuid)) for i in tasks])
     global is_first
     is_first = True
@@ -93,7 +93,9 @@ def print_tree(tasks, sort_filters, filters, root_task={'uuid': None}, limit=Non
                         'hidden_function': lambda h, d: print(' '*justw + ' | ' + ' '*4*d + str(h) + " tasks hidden."),
                         'limit': [limit],
                         'filters': filters,
-                        'nowrap': nowrap})
+                        'nowrap': nowrap,
+                        'no_uuid': args.no_uuid,
+                        'no_boxes': args.no_boxes})
 
 
 def assign_uuid(task):
@@ -220,7 +222,7 @@ def str_to_uuid(ctx, s, pending_only=True):
             cur_uuid = get_task(ctx, cur_uuid).parent
         elif i == '/':
             cur_uuid = None
-        elif i.replace('-', '').isdigit():
+        elif i[0] == '-' and i[1:].isdigit():
             cur_uuid = int(i)
             _ = get_task(ctx, cur_uuid) # check if exists
         else:
