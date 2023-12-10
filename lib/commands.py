@@ -64,6 +64,7 @@ class CommandManager:
 
         for i in ['add']:
             subparser = self.subparsers.add_parser(i, description="Add a new task to the list.")
+            subparser.add_argument('-b', '--bottom', action='store_true', help="Add the new task to the bottom of the list.")
             subparser.add_argument('details', type=str, nargs='+', help="Syntax: \n"+
             "{desc} [#{tag_1}] ... [#{tag_n}] [<- {dep}] [@ [{start}~] {due} [every {repeat}]]\n"+
             "Where anything inside [] is optional")
@@ -156,7 +157,10 @@ class CommandManager:
         cond.append('uuid in (' + ','.join([str(i.uuid) for i in family]) + ')')
         cond = ' AND '.join(cond)
         gauges = [i[0] for i in self.ctx.cur.execute('SELECT gauge FROM tasks WHERE ' + cond)]
-        gauge = min(gauges)-1 if len(gauges) > 0 else None
+        if args.bottom:
+            gauge = max(gauges)+1 if len(gauges) > 0 else 1
+        else:
+            gauge = min(gauges)-1 if len(gauges) > 0 else None
         print(task)
         self.ctx.cur.execute("INSERT INTO tasks (uuid, parent, desc) values (?, ?, ?)", (task.uuid, task.parent, task.desc))
         task.write_str('start', task.start)
@@ -249,8 +253,14 @@ class CommandManager:
         for uuid in uuids:
             task = get_task(self.ctx, uuid)
             if args.r:
-                tasks = self.ctx.cur.execute("SELECT uuid FROM tasks WHERE parent = ?", (uuid,)).fetchall()
                 descendants = task.get_descendants()
+                set_desc = set()
+                for i in descendants:
+                    if i.uuid in set_desc:
+                        print("Duplicate detected, cancelling")
+                        assert(0)
+                    else:
+                        set_desc.add(i.uuid)
                 for i in descendants:
                     remove(self.ctx.cur, i)
                 remove(self.ctx.cur, task)

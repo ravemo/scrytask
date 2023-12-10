@@ -69,7 +69,7 @@ class Task:
         return tag in self.tags
 
 
-    def get_children(self, filters=[]):
+    def get_children(self, filters=[], allow_none=True):
         """Returns all children of current tasks.
 
         Parameters
@@ -83,11 +83,13 @@ class Task:
             List of children tasks not blocked by filters.
         """
         if self.uuid is None:
+            assert allow_none
             l = list(self.cur.execute('select * from tasks where parent IS NULL').fetchall())
         else:
             l = list(self.cur.execute('select * from tasks where parent = {}'.format(self.uuid)).fetchall())
+            assert(self.uuid != self.parent)
         l = [Task(self.ctx, dict(i)) for i in l]
-        children = [i for i in l if not i.is_filtered(filters)]
+        children = l[:]
         if filters != []:
             children = [i for i in children if not i.is_filtered(filters)]
         return children
@@ -191,10 +193,19 @@ class Task:
     def get_descendants(self, filters=[]):
         # TODO: Do this with a recursive query or at least as many queries as
         # the depth of the task tree.
-        children = self.get_children(filters)
-        descendants = children
+        children = self.get_children(filters, False)
+        descendants = children[:]
+        assert False not in [i.parent == self.uuid for i in children]
         for i in children:
-            descendants += i.get_descendants(filters)
+            desc = i.get_descendants(filters)[:]
+            for j in desc:
+                if j.uuid in [k.uuid for k in descendants]:
+                    print("Conflict found:")
+                    print(vars(j))
+                    print(vars([k for k in descendants if k.uuid == j.uuid][0]))
+                    print([k for k in descendants if k.uuid == j.uuid][0] == j)
+                    assert(0)
+            descendants += desc
         return descendants
 
 

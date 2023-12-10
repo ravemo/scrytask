@@ -104,7 +104,7 @@ def assign_uuid(task):
 
 
 def remove(cur, task):
-    print('Removing task', task)
+    print('Removing task', '('+str(task.uuid)+')', task.desc)
     cur.execute("UPDATE tasks SET depends = replace(depends, ' {} ', ' ')".format(task.uuid)) 
     cur.execute("DELETE FROM tasks WHERE uuid = {}".format(task.uuid))
 
