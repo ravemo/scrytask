@@ -49,7 +49,8 @@ if __name__ == '__main__':
                   repeat TEXT,\
                   gauge REAL,\
                   created TEXT,\
-                  depends TEXT)")
+                  depends TEXT,\
+                  time INTEGER)")
 
 
 

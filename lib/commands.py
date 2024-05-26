@@ -1,5 +1,7 @@
 from prompt_toolkit.completion import NestedCompleter
 import parsedatetime as pdt
+import dateparser
+import datetime
 import argparse
 import shlex
 import os
@@ -60,6 +62,7 @@ class CommandManager:
                          'cd',
                          'search',
                          'quit',
+                         'time',
                          }
 
         for i in ['add']:
@@ -105,11 +108,12 @@ class CommandManager:
             subparser.add_argument('--clear', action='store_true', help="Remove all dependencies")
             subparser.add_argument('--chain', action='store_true', help="Make the tasks on each argument depend on the task of the next argument.")
 
-        for i in ['rename', 'start', 'due', 'repeat']:
+        for i in ['rename', 'start', 'due', 'repeat', 'time']:
             description = {'rename': 'Rename task',
                            'start': 'Set start date',
                            'due': 'Set due date',
-                           'repeat': 'Set repeat interval'}
+                           'repeat': 'Set repeat interval',
+                           'time': 'Set time estimate to completion'}
             subparser = self.subparsers.add_parser(i, description=description[i])
             subparser.add_argument('id', type=str, help="Task to be modified")
             subparser.add_argument('details', type=str, nargs='*', help="Details of new parameters. Leave empty if you want to reset to default.")
@@ -471,6 +475,17 @@ class CommandManager:
     def cmd_quit(self, _args):
         quit()
 
+    def cmd_time(self, args):
+        task = get_task(self.ctx, str_to_uuid(self.ctx, args.id))
+        details = ' '.join(args.details)
+        if details == '':
+            new_val = None
+        else:
+            relative_base = datetime.now()
+            new_val = int((relative_base - dateparser.parse(details, settings={'RELATIVE_BASE': relative_base})).total_seconds())
+        print("set new time to", str(new_val), "seconds")
+        task.write_int("time", new_val)
+
 
     def reload_autocomplete(self):
         data = self.ctx.cur.execute("SELECT c.desc FROM tasks c LEFT JOIN tasks p ON p.uuid = c.parent "+
@@ -503,7 +518,7 @@ class CommandManager:
             full_command = full_command.replace(r'\/', r'\\/')
             argv[1:] = shlex.split(full_command)[1:]
         if self.whitelist is not None and cmd not in self.whitelist:
-            print("Command now allowed:", cmd)
+            print("Command not allowed:", cmd)
             assert(0)
 
         if cmd not in self.all_cmds:
